@@ -1,0 +1,24 @@
+{
+  "name": "electron-vue-note",
+  "version": "1.0.0",
+  "description": "Electron + Vite + Vue 笔记应用",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node dev.js",
+    "vite": "vite",
+    "build": "vite build && electron-builder",
+    "start": "electron . --no-sandbox"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "pinia": "^3.0.4",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "electron": "^39.2.7",
+    "vite": "^5.0.0"
+  }
+}

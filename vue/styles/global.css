@@ -1,0 +1,85 @@
+:root {
+    --titlebar-h: 32px;
+    --statusbar-h: 26px;
+    --sidebar-w: 200px;
+
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: blur(14px);
+
+    --radius-md: 10px;
+    --radius-lg: 14px;
+
+    --ease: cubic-bezier(.4, 0, .2, 1);
+}
+
+/* 暗色主题（默认） */
+html[data-theme="dark"],
+html {
+    --text-primary: #d4d4d4;
+    --text-secondary: #ccc;
+    --bg-primary: #1e1e1e;
+    --bg-sidebar: rgba(40, 40, 40, 0.55);
+    --glass-bg: rgba(40, 40, 40, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --panel-bg: rgba(30, 30, 30, 0.55);
+    --titlebar-bg: rgba(30, 30, 30, 0.65);
+}
+
+/* 亮色主题 */
+html[data-theme="light"] {
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --bg-primary: #ffffff;
+    --bg-sidebar: rgba(240, 240, 240, 0.85);
+    --glass-bg: rgba(240, 240, 240, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --panel-bg: rgba(250, 250, 250, 0.9);
+    --titlebar-bg: rgba(245, 245, 245, 0.9);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+button,
+select,
+input {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+select,
+textarea {
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 6px 10px;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: rgba(0, 122, 204, 0.8);
+}
