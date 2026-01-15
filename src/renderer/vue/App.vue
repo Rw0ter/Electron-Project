@@ -335,12 +335,12 @@ onMounted(async () => {
     await loadFriends();
     pollTimers.friends = setInterval(() => {
         loadFriends({ silent: true });
-    }, 5000);
+    }, 3000);
     pollTimers.messages = setInterval(() => {
         if (activeFriend.value?.uid) {
             loadMessages(activeFriend.value.uid, { silent: true });
         }
-    }, 3000);
+    }, 1000);
 });
 
 onBeforeUnmount(() => {
@@ -713,6 +713,7 @@ onBeforeUnmount(() => {
 .bubble-text {
     font-size: 14px;
     line-height: 1.5;
+    font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -743,7 +744,7 @@ onBeforeUnmount(() => {
 .composer textarea {
     min-height: 70px;
     resize: none;
-    font-family: "JetBrains Mono", monospace;
+    font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 .send-btn {
