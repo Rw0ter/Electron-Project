@@ -68,6 +68,8 @@ import { reactive, ref } from 'vue';
 
 const mode = ref('login');
 const message = ref('');
+
+const agree = ref(false);
 const form = reactive({
     username: '',
     password: '',
@@ -88,6 +90,12 @@ const toggleMode = () => {
 
 const handleSubmit = async () => {
     message.value = '';
+
+    if (!agree.value) {
+  message.value = '请先勾选同意协议。';
+  return;
+}
+
 
     if (!form.username || !form.password) {
         message.value = '请输入用户名和密码。';
