@@ -22,28 +22,7 @@
         </div>
 
         <div class="card">
-            <h2>QQ</h2>
-            <img class="user-image" src="/img/user.jpg" alt="用户头像" />
-            <p id="UserName">Rw0ter.NT</p>
-
-            <div class="mode-toggle">
-                <button
-                    type="button"
-                    class="mode-btn"
-                    :class="{ active: mode === 'login' }"
-                    @click="mode = 'login'"
-                >
-                    登录
-                </button>
-                <button
-                    type="button"
-                    class="mode-btn"
-                    :class="{ active: mode === 'register' }"
-                    @click="mode = 'register'"
-                >
-                    注册
-                </button>
-            </div>
+            <h2 class="top_title">信聊</h2>
 
             <div class="form">
                 <input v-model.trim="form.username" type="text" placeholder="用户名" />
@@ -56,11 +35,30 @@
                 />
             </div>
 
+             <label class="agreement">
+        <input v-model="agree" type="checkbox" />
+        <span class="radio"></span>
+        <span class="a-text">
+          已阅读并同意
+          <a href="#" @click.prevent>服务协议</a>和<a href="#" @click.prevent>信技隐私保护指引</a>
+        </span>
+      </label>
+
             <button class="submit-btn" type="button" @click="handleSubmit">
                 {{ mode === 'login' ? '登录' : '注册' }}
             </button>
 
-            <p class="note" v-if="message">{{ message }}</p>
+            <p class="note">{{ message }}</p>
+
+
+              <!-- 底部链接 -->
+      <div class="bottom-links">
+        <a href="#" @click.prevent>扫码登录</a>
+        <span class="sep">|</span>
+        <a href="#" @click.prevent="toggleMode">
+          {{ mode === 'login' ? '注册账号' : '返回登录' }}
+        </a>
+      </div>
         </div>
     </div>
 </template>
@@ -79,6 +77,14 @@ const form = reactive({
 const handleMin = () => window.electronAPI?.windowMin?.();
 const handleMax = () => window.electronAPI?.windowMax?.();
 const handleClose = () => window.electronAPI?.windowClose?.();
+
+const toggleMode = () => {
+  message.value = "";
+  mode.value = mode.value === "login" ? "register" : "login";
+  if (mode.value === "register") {
+    form.confirmPassword = "";
+  }
+};
 
 const handleSubmit = async () => {
     message.value = '';
@@ -255,8 +261,19 @@ const handleSubmit = async () => {
     background: radial-gradient(50% 50% at 50% 50%, rgba(65, 56, 210, 0.50) 15.62%, rgba(65, 56, 210, 0) 100%);
 }
 
+
+.top_title {
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 24px;
+    position: fixed;
+    top: 55px;
+    text-align: center;
+}
+
 .card {
     padding: 20px;
+    padding-top: 90px;
     width: 320px;
     border-radius: 8px;
     display: flex;
@@ -272,18 +289,28 @@ h2 {
     font-weight: 600;
 }
 
+input::placeholder{
+    color: white;
+}
+
+
 input {
-    width: 100%;
-    padding: 8px 10px;
-    margin: 8px 0;
+    outline: none;
+    width: 240px;
+    height: 30px;
     border-radius: 4px;
     border: 1px solid #203044;
-    background: #071018;
-    color: #e6eef8;
+    background: #ffffff2d;
+    color: #ffffff;
+    padding: 5px;
+border-radius: 8px;
+margin-left: 35px;
+margin-bottom: 20px;
+
 }
 
 .submit-btn {
-    width: 90%;
+    width: 80vw;
     padding: 10px;
     border-radius: 12px;
     border: none;
@@ -292,14 +319,16 @@ input {
     font-size: 16px;
     font-weight: 500;
     cursor: pointer;
-    margin-top: 12px;
+    margin-top: 22px;
 }
 
-.note {
-    margin-top: 10px;
-    font-size: 12px;
-    color: #9fb3d4;
-    text-align: center;
+.note{
+  margin-top: 10px;
+  font-size: 12px;
+  color: #9fb3d4;
+  text-align: center;
+
+  min-height: 20px;
 }
 
 #titlebar {
@@ -352,6 +381,46 @@ input {
     color: #fff;
 }
 
+.agreement {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  user-select: none;
+  cursor: pointer;
+}
+.agreement input {
+  display: none;
+}
+.radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1.8px solid rgba(255, 255, 255, 0.35);
+  position: relative;
+  flex: 0 0 auto;
+}
+.agreement input:checked + .radio {
+  border-color: #2f7cff;
+}
+.agreement input:checked + .radio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  background: #2f7cff;
+}
+
+.a-text a {
+  color: #64a8ff;
+  text-decoration: none;
+}
+.a-text a:hover {
+  text-decoration: underline;
+}
+
 .wc-icon {
     font-family: "Segoe MDL2 Assets";
     font-size: 8px;
@@ -394,6 +463,28 @@ input {
     background: rgba(37, 99, 235, 0.2);
     color: #e6eef8;
     border-color: rgba(37, 99, 235, 0.5);
+}
+
+/* 底部 “扫码登录 | 注册账号” */
+.bottom-links {
+    position: fixed;
+    bottom: 15px;
+    left: 93px;
+  text-align: center;
+  font-size: 14px;
+}
+.bottom-links a {
+  color: #64a8ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+.bottom-links a:hover {
+  text-decoration: underline;
+}
+
+.sep {
+  margin: 0 10px;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .form {
