@@ -76,6 +76,8 @@ const form = reactive({
     confirmPassword: ''
 });
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+
 const handleMin = () => window.electronAPI?.windowMin?.();
 const handleMax = () => window.electronAPI?.windowMax?.();
 const handleClose = () => window.electronAPI?.windowClose?.();
@@ -109,24 +111,38 @@ const handleSubmit = async () => {
 
     try {
         if (mode.value === 'register') {
-            const result = await window.electronAPI?.authRegister?.({
-                username: form.username,
-                password: form.password
+            const response = await fetch(`${API_BASE}/api/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: form.username,
+                    password: form.password
+                })
             });
+            const result = await response.json();
             message.value = result?.message || '注册成功，请登录。';
-            if (result?.success) {
+            if (response.ok && result?.success) {
                 mode.value = 'login';
                 form.confirmPassword = '';
             }
             return;
         }
 
-        const result = await window.electronAPI?.authLogin?.({
-            username: form.username,
-            password: form.password
+        const response = await fetch(`${API_BASE}/api/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: form.username,
+                password: form.password
+            })
         });
+        const result = await response.json();
 
-        if (result?.success) {
+        if (response.ok && result?.success) {
             await window.electronAPI?.loginSuccess?.();
             return;
         }

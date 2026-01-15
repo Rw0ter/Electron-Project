@@ -5,6 +5,7 @@ This is an Electron + Vue project scaffolded locally.
 ## Overview
 
 - Electron application with Vue frontend
+- Node.js + Express backend (local auth service)
 
 ## Structure
 
@@ -21,6 +22,7 @@ This is an Electron + Vue project scaffolded locally.
 - Install dependencies: `npm install`
 - Start dev (Vite + Electron): `npm run dev`
   - Uses `configs/vite/vite.config.dev.js`
+- Start backend: `npm run backend` (default port: 3001)
 
 ## Production (上线版本)
 
