@@ -71,6 +71,19 @@ const ensureUserDefaults = async (users) => {
       user.friends = [];
       updated = true;
     }
+    if (!user.friendRequests || typeof user.friendRequests !== 'object') {
+      user.friendRequests = { incoming: [], outgoing: [] };
+      updated = true;
+      return;
+    }
+    if (!Array.isArray(user.friendRequests.incoming)) {
+      user.friendRequests.incoming = [];
+      updated = true;
+    }
+    if (!Array.isArray(user.friendRequests.outgoing)) {
+      user.friendRequests.outgoing = [];
+      updated = true;
+    }
   });
 
   if (updated) {
