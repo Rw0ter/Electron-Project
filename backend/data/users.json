@@ -10,12 +10,13 @@
     "createdAt": "2026-01-15T06:45:19.412Z",
     "friends": [
       100000001,
-      100000002
+      100000002,
+      100000003
     ],
     "signature": "原神牛逼",
-    "token": "50e4350e25276f3c55d19ed59446f2c9fdc5ab69c7c9d65dc8d7384927d0e270",
-    "tokenExpiresAt": "2026-07-16T03:35:50.113Z",
-    "lastLoginAt": "2026-01-16T03:35:50.113Z",
+    "token": "70024dddd644be68b00dbfd63577709c2dc621d33291dd46a7bdb3d8fb33c735",
+    "tokenExpiresAt": "2026-07-16T09:49:02.696Z",
+    "lastLoginAt": "2026-01-16T09:49:02.696Z",
     "online": true,
     "nickname": "rw0ter",
     "gender": "",
@@ -82,5 +83,33 @@
       "incoming": [],
       "outgoing": []
     }
+  },
+  {
+    "uid": 100000003,
+    "username": "demouser",
+    "passwordHash": "9d8287c8052bca055070ff9f760216a12458e6a4f4afd042d11992179469369c0fd9b9c7e233eb6c3cd44cf8d3bae8874375f1eab3cfec26b9af4cf7de614757",
+    "salt": "db3823dbd13f6df80af3a65d3bd9d005",
+    "iterations": 120000,
+    "keylen": 64,
+    "digest": "sha512",
+    "createdAt": "2026-01-16T09:49:59.315Z",
+    "friends": [
+      100000000
+    ],
+    "signature": "这个人很神秘，暂未填写签名",
+    "nickname": "demouser",
+    "gender": "",
+    "birthday": "",
+    "country": "",
+    "province": "",
+    "region": "",
+    "online": true,
+    "friendRequests": {
+      "incoming": [],
+      "outgoing": []
+    },
+    "token": "59cde1aac4c4a9e75856461cc055cd1c97b9e45e99338b67eb83196a8c2e2e6e",
+    "tokenExpiresAt": "2026-07-16T09:51:32.737Z",
+    "lastLoginAt": "2026-01-16T09:51:32.737Z"
   }
 ]
