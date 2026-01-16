@@ -132,13 +132,13 @@
     "country": "",
     "province": "",
     "region": "",
-    "online": false,
+    "online": true,
     "friendRequests": {
       "incoming": [],
       "outgoing": []
     },
-    "token": "77cb230618728fbee49b5d012dffcab7fc1a4ea4abdce794dc3b436056c6d4fd",
-    "tokenExpiresAt": "2026-07-16T10:00:29.673Z",
-    "lastLoginAt": "2026-01-16T10:00:29.673Z"
+    "token": "42aabcc81fb14eb368bddd53fdd7e3b4e1005e30b7a4e5d931b7d705ae1aa5da",
+    "tokenExpiresAt": "2026-07-16T12:50:38.899Z",
+    "lastLoginAt": "2026-01-16T12:50:38.899Z"
   }
 ]

@@ -714,18 +714,22 @@ const handleWsMessage = (payload) => {
     if (!entry.id || messageIdSet.has(entry.id)) {
         return;
     }
+    messageIdSet.add(entry.id);
     const activeUid = activeFriend.value?.uid;
+    if (
+        entry.targetType === 'private' &&
+        entry.senderUid !== auth.value.uid &&
+        (!activeUid || entry.senderUid !== activeUid)
+    ) {
+        playNotifySound();
+    }
     if (
         entry.targetType === 'private' &&
         activeUid &&
         ((entry.senderUid === auth.value.uid && entry.targetUid === activeUid) ||
             (entry.senderUid === activeUid && entry.targetUid === auth.value.uid))
     ) {
-        messageIdSet.add(entry.id);
         messages.value = [...messages.value, entry];
-        if (entry.senderUid !== auth.value.uid) {
-            playNotifySound();
-        }
         nextTick(() => {
             scrollToBottom();
         });
