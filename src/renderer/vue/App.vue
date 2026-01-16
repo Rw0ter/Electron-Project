@@ -45,7 +45,7 @@
                                     <div class="profile-detail">性别：{{ auth.gender || '未设置' }}</div>
                                     <div class="profile-detail">生日：{{ auth.birthday || '未设置' }}</div>
                                     <div class="profile-detail">
-                                        地区：{{ auth.country || '未设置' }}{{ auth.province ? ` / ${auth.province}` : '' }}{{ auth.region ? ` / ${auth.region}` : '' }}
+                                        城市：{{ auth.country || '未设置' }}{{ auth.province ? ` / ${auth.province}` : '' }}{{ auth.region ? ` / ${auth.region}` : '' }}
                                     </div>
                                 </div>
                             </div>
@@ -418,52 +418,34 @@
 
                     <label class="profile-field">
                         <span class="profile-field__label">性别</span>
-                        <select v-model="editForm.gender">
-                            <option value="">请选择</option>
-                            <option value="男">男</option>
-                            <option value="女">女</option>
-                            <option value="保密">保密</option>
-                        </select>
+                        <SelectField v-model="editForm.gender" :options="genderOptions" />
                     </label>
 
                     <label class="profile-field">
                         <span class="profile-field__label">生日</span>
-                        <input v-model="editForm.birthday" type="date" />
+                        <input v-model="editForm.birthday" type="date" class="profile-field__date" />
                     </label>
 
                     <label class="profile-field">
                         <span class="profile-field__label">国家</span>
-                        <select v-model="editForm.country">
-                            <option value="">请选择</option>
-                            <option value="中国">中国</option>
-                            <option value="美国">美国</option>
-                            <option value="日本">日本</option>
-                            <option value="其他">其他</option>
-                        </select>
+                        <SelectField v-model="editForm.country" :options="countryOptions" />
                     </label>
 
-                    <div class="profile-field profile-field--split">
+                    <div
+                        v-if="editForm.country === '中国'"
+                        class="profile-field profile-field--split"
+                    >
                         <label>
                             <span class="profile-field__label">省份</span>
-                            <select v-model="editForm.province">
-                                <option value="">请选择</option>
-                                <option value="北京">北京</option>
-                                <option value="上海">上海</option>
-                                <option value="广东">广东</option>
-                                <option value="浙江">浙江</option>
-                                <option value="其他">其他</option>
-                            </select>
+                            <SelectField v-model="editForm.province" :options="provinceOptions" />
                         </label>
                         <label>
-                            <span class="profile-field__label">地区</span>
-                            <select v-model="editForm.region">
-                                <option value="">请选择</option>
-                                <option value="华北">华北</option>
-                                <option value="华东">华东</option>
-                                <option value="华南">华南</option>
-                                <option value="西南">西南</option>
-                                <option value="其他">其他</option>
-                            </select>
+                            <span class="profile-field__label">城市</span>
+                            <SelectField
+                                v-model="editForm.region"
+                                :options="cityOptions"
+                                :disabled="!cityOptions.length"
+                            />
                         </label>
                     </div>
                 </div>
@@ -478,6 +460,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, nextTick, watch } from 'vue';
+import SelectField from './components/SelectField.vue';
+import { COUNTRIES, CHINA_PROVINCES, CHINA_CITIES_BY_PROVINCE } from './utils/geo';
 import { API_BASE } from './utils/api.js';
 const NOTIFY_SOUND_URL = `${API_BASE}/resource/messagenotify.wav`;
 
@@ -531,6 +515,15 @@ const editForm = ref({
     country: '',
     province: '',
     region: ''
+});
+const genderOptions = ['男', '女', '保密'];
+const countryOptions = COUNTRIES;
+const provinceOptions = computed(() => {
+    return editForm.value.country === '中国' ? CHINA_PROVINCES : [];
+});
+const cityOptions = computed(() => {
+    if (editForm.value.country !== '中国') return [];
+    return CHINA_CITIES_BY_PROVINCE[editForm.value.province] || [];
 });
 
 const handleLogout = () => {
@@ -627,6 +620,24 @@ const scheduleHideProfile = () => {
     }, 120);
 };
 
+watch(
+    () => editForm.value.country,
+    (next, prev) => {
+        if (next !== prev) {
+            editForm.value.province = '';
+            editForm.value.region = '';
+        }
+    }
+);
+
+watch(
+    () => editForm.value.province,
+    (next, prev) => {
+        if (next !== prev) {
+            editForm.value.region = '';
+        }
+    }
+);
 const buildWsUrl = () => {
     const base = new URL(API_BASE);
     base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1259,7 +1270,7 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 10px;
     padding: 6px 10px;
-    border-radius: 12px;
+    border-radius: 0 0 12px 12px;
     background: var(--panel-soft);
     border: 1px solid var(--line);
 }
@@ -1400,20 +1411,23 @@ onBeforeUnmount(() => {
 .profile-modal__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(15, 23, 42, 0.25);
-    backdrop-filter: blur(4px);
+    background: rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px);
 }
 
 .profile-modal__panel {
     position: relative;
     width: 520px;
     max-width: calc(100vw - 32px);
-    background: #f7f9ff;
+    max-height: calc(100vh - 64px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 255, 0.98));
     border-radius: 18px;
-    border: 1px solid rgba(31, 65, 120, 0.12);
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+    border: 1px solid rgba(72, 147, 214, 0.2);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
     padding: 20px 22px 18px;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
     -webkit-app-region: no-drag;
 }
 
@@ -1441,6 +1455,11 @@ onBeforeUnmount(() => {
 .profile-modal__body {
     display: grid;
     gap: 12px;
+    overflow-y: auto;
+    padding-right: 6px;
+    flex: 1;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .profile-modal__avatar {
@@ -1486,6 +1505,38 @@ onBeforeUnmount(() => {
 .profile-field select,
 .profile-field input[type="date"] {
     width: 100%;
+}
+
+.profile-modal input {
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #fff;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #1c2436;
+    font-family: inherit;
+}
+
+.profile-modal input:focus,
+.profile-modal select:focus {
+    outline: none;
+    border-color: rgba(72, 147, 214, 0.5);
+    box-shadow: 0 0 0 3px rgba(72, 147, 214, 0.15);
+}
+
+.profile-field__date {
+    appearance: none;
+    border: 1px solid rgba(31, 65, 120, 0.18);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #1c2436;
+    background: #fff;
+}
+
+.profile-field__date::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
 }
 
 .profile-field--split {
