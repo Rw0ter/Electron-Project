@@ -1,5 +1,5 @@
 ﻿<template>
-    <div class="app-shell">
+    <div class="app-shell" :class="{ 'app-enter': isReady }">
         <header class="topbar">
             <div class="brand">
                 <div class="brand-mark">R</div>
@@ -12,11 +12,50 @@
                 <div class="status-pill">{{ statusText }}</div>
             </div>
             <div class="topbar-right">
-                <div class="user-card">
-                    <div class="user-avatar">{{ initials }}</div>
-                    <div class="user-meta">
-                        <div class="user-name">{{ displayName }}</div>
-                        <div class="user-id">UID {{ auth.uid || '---' }}</div>
+                <div class="user-card-wrap">
+                    <div
+                        class="user-card"
+                        @mouseenter="showProfile"
+                        @mouseleave="scheduleHideProfile"
+                    >
+                        <div
+                            class="user-avatar user-avatar-trigger"
+                            @mouseenter="showProfile"
+                        >
+                            {{ initials }}
+                        </div>
+                        <div class="user-meta">
+                            <div class="user-name">{{ displayName }}</div>
+                            <div class="user-id">UID {{ auth.uid || '---' }}</div>
+                        </div>
+                    </div>
+                    <div
+                        class="profile-popover"
+                        :class="{ 'is-visible': isProfileVisible }"
+                        @mouseenter="showProfile"
+                        @mouseleave="hideProfile"
+                    >
+                        <div class="profile-head">
+                            <div class="profile-avatar">{{ initials }}</div>
+                            <div class="profile-meta">
+                                <div class="profile-name">{{ displayName }}</div>
+                                <div class="profile-uid">UID {{ auth.uid || '---' }}</div>
+                                <div class="profile-signature">{{ signature }}</div>
+                                <div class="profile-details">
+                                    <div class="profile-detail">性别：{{ auth.gender || '未设置' }}</div>
+                                    <div class="profile-detail">生日：{{ auth.birthday || '未设置' }}</div>
+                                    <div class="profile-detail">
+                                        地区：{{ auth.country || '未设置' }}{{ auth.province ? ` / ${auth.province}` : '' }}{{ auth.region ? ` / ${auth.region}` : '' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="profile-actions">
+                            <button class="profile-btn" type="button" @click="openEditProfile">编辑资料</button>
+                            <button class="profile-btn ghost" type="button" @click="handleLogout">
+                                退出登录
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="window-controls">
@@ -196,6 +235,13 @@
                             <span class="chip">online</span>
                         </div>
                     </div>
+                    <div class="chat-actions">
+                        <span class="chip">private</span>
+                        <span class="chip" :class="{ offline: !activeFriendOnline }">
+                            {{ activeFriendOnline ? 'online' : 'offline' }}
+                        </span>
+                    </div>
+                </div>
 
                     <div class="chat-body" ref="chatBodyRef">
                         <div v-if="loading" class="loading">加载中...</div>
@@ -335,6 +381,99 @@
                 </div>
             </section>
         </main>
+        <div v-if="isEditOpen" class="profile-modal">
+            <div class="profile-modal__backdrop" @click="closeEditProfile"></div>
+            <div class="profile-modal__panel">
+                <div class="profile-modal__header">
+                    <div class="profile-modal__title">编辑资料</div>
+                    <button class="profile-modal__close" type="button" @click="closeEditProfile">×</button>
+                </div>
+                <div class="profile-modal__body">
+                    <div class="profile-modal__avatar">{{ initials }}</div>
+
+                    <label class="profile-field">
+                        <span class="profile-field__label">昵称</span>
+                        <div class="profile-field__control">
+                            <input
+                                v-model.trim="editForm.nickname"
+                                type="text"
+                                maxlength="36"
+                                placeholder="请输入昵称"
+                            />
+                            <span class="profile-field__count">{{ nicknameCount }}/36</span>
+                        </div>
+                    </label>
+
+                    <label class="profile-field">
+                        <span class="profile-field__label">个签</span>
+                        <div class="profile-field__control">
+                            <input
+                                v-model.trim="editForm.signature"
+                                type="text"
+                                maxlength="80"
+                                placeholder="编辑个签，展示我的独特态度"
+                            />
+                            <span class="profile-field__count">{{ signatureCount }}/80</span>
+                        </div>
+                    </label>
+
+                    <label class="profile-field">
+                        <span class="profile-field__label">性别</span>
+                        <select v-model="editForm.gender">
+                            <option value="">请选择</option>
+                            <option value="男">男</option>
+                            <option value="女">女</option>
+                            <option value="保密">保密</option>
+                        </select>
+                    </label>
+
+                    <label class="profile-field">
+                        <span class="profile-field__label">生日</span>
+                        <input v-model="editForm.birthday" type="date" />
+                    </label>
+
+                    <label class="profile-field">
+                        <span class="profile-field__label">国家</span>
+                        <select v-model="editForm.country">
+                            <option value="">请选择</option>
+                            <option value="中国">中国</option>
+                            <option value="美国">美国</option>
+                            <option value="日本">日本</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </label>
+
+                    <div class="profile-field profile-field--split">
+                        <label>
+                            <span class="profile-field__label">省份</span>
+                            <select v-model="editForm.province">
+                                <option value="">请选择</option>
+                                <option value="北京">北京</option>
+                                <option value="上海">上海</option>
+                                <option value="广东">广东</option>
+                                <option value="浙江">浙江</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span class="profile-field__label">地区</span>
+                            <select v-model="editForm.region">
+                                <option value="">请选择</option>
+                                <option value="华北">华北</option>
+                                <option value="华东">华东</option>
+                                <option value="华南">华南</option>
+                                <option value="西南">西南</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <div class="profile-modal__footer">
+                    <button class="profile-btn" type="button" @click="saveProfile">保存</button>
+                    <button class="profile-btn ghost" type="button" @click="closeEditProfile">取消</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -342,8 +481,23 @@
 import { computed, onBeforeUnmount, onMounted, ref, nextTick } from 'vue';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+const NOTIFY_SOUND_URL = `${API_BASE}/resource/messagenotify.wav`;
 
-const auth = ref({ token: '', uid: null, username: '' });
+const auth = ref({
+    token: '',
+    uid: null,
+    username: '',
+    nickname: '',
+    signature: '',
+    gender: '',
+    birthday: '',
+    country: '',
+    province: '',
+    region: ''
+});
+const isReady = ref(false);
+const isProfileVisible = ref(false);
+const isEditOpen = ref(false);
 const friends = ref([]);
 const activeFriend = ref(null);
 const messages = ref([]);
@@ -361,15 +515,119 @@ const showSendMenu = ref(false);
 const pollTimers = {
     friends: null,
     messages: null,
+    profile: null
     requests: null
 };
 const lastFriendSignature = ref('');
 const lastMessageSignature = ref('');
+const lastNotifiedMessageId = ref('');
 
 const handleMin = () => window.electronAPI?.windowMin?.();
 const handleMax = () => window.electronAPI?.windowMax?.();
 const handleClose = () => window.electronAPI?.windowClose?.();
 const openFoundFriend = () => window.electronAPI?.openFoundFriend?.();
+let profileHideTimer = null;
+const editForm = ref({
+    nickname: '',
+    signature: '',
+    gender: '',
+    birthday: '',
+    country: '',
+    province: '',
+    region: ''
+});
+
+const handleLogout = () => {
+    try {
+        localStorage.removeItem('vp_username');
+        localStorage.removeItem('vp_signature');
+    } catch {}
+    if (auth.value.token) {
+        fetch(`${API_BASE}/api/logout`, {
+            method: 'POST',
+            headers: authHeader()
+        }).catch(() => {});
+    }
+    window.electronAPI?.logout?.();
+};
+
+const openEditProfile = () => {
+    editForm.value = {
+        nickname: auth.value.nickname || auth.value.username || '',
+        signature: auth.value.signature || '',
+        gender: auth.value.gender || '',
+        birthday: auth.value.birthday || '',
+        country: auth.value.country || '',
+        province: auth.value.province || '',
+        region: auth.value.region || ''
+    };
+    isEditOpen.value = true;
+};
+
+const closeEditProfile = () => {
+    isEditOpen.value = false;
+};
+
+const saveProfile = async () => {
+    if (!auth.value.token) return;
+    const payload = {
+        nickname: editForm.value.nickname || '',
+        signature: editForm.value.signature || '',
+        gender: editForm.value.gender || '',
+        birthday: editForm.value.birthday || '',
+        country: editForm.value.country || '',
+        province: editForm.value.province || '',
+        region: editForm.value.region || ''
+    };
+    try {
+        const res = await fetch(`${API_BASE}/api/profile`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeader()
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data?.success && data.user) {
+            auth.value = {
+                ...auth.value,
+                ...data.user
+            };
+            try {
+                localStorage.setItem('vp_username', auth.value.username || '');
+                localStorage.setItem('vp_nickname', auth.value.nickname || '');
+                localStorage.setItem('vp_signature', auth.value.signature || '');
+            } catch {}
+            isEditOpen.value = false;
+        }
+    } catch {}
+};
+
+const showProfile = () => {
+    if (profileHideTimer) {
+        clearTimeout(profileHideTimer);
+        profileHideTimer = null;
+    }
+    isProfileVisible.value = true;
+};
+
+const hideProfile = () => {
+    if (profileHideTimer) {
+        clearTimeout(profileHideTimer);
+        profileHideTimer = null;
+    }
+    isProfileVisible.value = false;
+};
+
+const scheduleHideProfile = () => {
+    if (profileHideTimer) {
+        clearTimeout(profileHideTimer);
+    }
+    profileHideTimer = setTimeout(() => {
+        isProfileVisible.value = false;
+        profileHideTimer = null;
+    }, 120);
 const openContacts = async () => {
     activeView.value = 'contacts';
     await loadRequests({ silent: true });
@@ -385,13 +643,20 @@ const handleDocumentClick = () => {
 };
 
 const displayName = computed(() => {
-    return auth.value.username || `用户${auth.value.uid || ''}`;
+    return auth.value.nickname || auth.value.username || `用户${auth.value.uid || ''}`;
 });
 
 const initials = computed(() => {
     const name = auth.value.username || 'ME';
     return name.slice(0, 2).toUpperCase();
 });
+
+const signature = computed(() => {
+    return auth.value.signature || '这个人很神秘，暂未填写签名';
+});
+
+const nicknameCount = computed(() => editForm.value.nickname.length);
+const signatureCount = computed(() => editForm.value.signature.length);
 
 const filteredFriends = computed(() => {
     const query = searchText.value.trim().toLowerCase();
@@ -409,6 +674,11 @@ const canSend = computed(() => {
         !!activeFriend.value?.uid &&
         draft.value.trim().length > 0
     );
+});
+
+const activeFriendOnline = computed(() => {
+    if (!activeFriend.value) return false;
+    return activeFriend.value.online === true;
 });
 
 const formatTime = (value) => {
@@ -493,22 +763,91 @@ const authHeader = () => {
     return { Authorization: `Bearer ${auth.value.token}` };
 };
 
+const playNotifySound = () => {
+    try {
+        const audio = new Audio(NOTIFY_SOUND_URL);
+        audio.play().catch(() => {});
+    } catch {}
+};
+
+const loadProfile = async ({ silent } = {}) => {
+    if (!auth.value.token) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/profile`, {
+            headers: authHeader()
+        });
+        const data = await res.json();
+        if (res.ok && data?.success && data.user) {
+            const next = {
+                uid: data.user.uid || auth.value.uid,
+                username: data.user.username || auth.value.username,
+                nickname: data.user.nickname || auth.value.nickname,
+                signature: data.user.signature || auth.value.signature,
+                gender: data.user.gender || auth.value.gender,
+                birthday: data.user.birthday || auth.value.birthday,
+                country: data.user.country || auth.value.country,
+                province: data.user.province || auth.value.province,
+                region: data.user.region || auth.value.region
+            };
+            const changed = Object.keys(next).some(
+                (key) => next[key] !== auth.value[key]
+            );
+            if (changed) {
+                auth.value = {
+                    ...auth.value,
+                    ...next
+                };
+                try {
+                    localStorage.setItem('vp_username', auth.value.username || '');
+                    localStorage.setItem('vp_nickname', auth.value.nickname || '');
+                    localStorage.setItem('vp_signature', auth.value.signature || '');
+                } catch {}
+            }
+        }
+    } catch (error) {
+        if (!silent) {
+            console.warn('Profile refresh failed', error);
+        }
+    }
+};
 const loadAuth = async () => {
     const info = await window.electronAPI?.getAuthToken?.();
     if (info?.token) {
         auth.value = {
             token: info.token,
             uid: info.uid,
-            username: info.username || ''
+            username: info.username || '',
+            nickname: info.nickname || '',
+            signature: info.signature || '',
+            gender: info.gender || '',
+            birthday: info.birthday || '',
+            country: info.country || '',
+            province: info.province || '',
+            region: info.region || ''
         };
     } else {
         const fallback = localStorage.getItem('vp_username');
-        auth.value = { token: '', uid: null, username: fallback || '' };
+        const fallbackNickname = localStorage.getItem('vp_nickname');
+        const fallbackSignature = localStorage.getItem('vp_signature');
+        auth.value = {
+            token: '',
+            uid: null,
+            username: fallback || '',
+            nickname: fallbackNickname || '',
+            signature: fallbackSignature || '',
+            gender: '',
+            birthday: '',
+            country: '',
+            province: '',
+            region: ''
+        };
     }
 };
 
 const buildFriendSignature = (items) => {
-    return items.map((item) => `${item.uid}-${item.username}`).join('|');
+    return items
+        .map((item) => `${item.uid}-${item.username}-${item.online ? 1 : 0}`)
+        .join('|');
 };
 
 const buildMessageSignature = (items) => {
@@ -533,7 +872,12 @@ const loadFriends = async ({ silent } = {}) => {
                 friends.value = next;
                 lastFriendSignature.value = signature;
             }
-            if (!activeFriend.value && friends.value.length) {
+            if (activeFriend.value) {
+                const refreshed = next.find((item) => item.uid === activeFriend.value.uid);
+                if (refreshed && refreshed !== activeFriend.value) {
+                    activeFriend.value = refreshed;
+                }
+            } else if (friends.value.length) {
                 selectFriend(friends.value[0]);
             }
         }
@@ -558,6 +902,17 @@ const loadMessages = async (targetUid, { silent } = {}) => {
             const signature = buildMessageSignature(next);
             if (signature !== lastMessageSignature.value) {
                 const shouldStick = isAtBottom();
+                const incoming = next.filter(
+                    (msg) => msg.senderUid !== auth.value.uid
+                );
+                if (incoming.length) {
+                    const latestIncoming = incoming[incoming.length - 1];
+                    const latestId = latestIncoming.id || latestIncoming.createdAt || '';
+                    if (latestId && latestId !== lastNotifiedMessageId.value) {
+                        playNotifySound();
+                        lastNotifiedMessageId.value = latestId;
+                    }
+                }
                 messages.value = next;
                 lastMessageSignature.value = signature;
                 if (shouldStick) {
@@ -655,7 +1010,11 @@ const scrollToBottom = () => {
 };
 
 onMounted(async () => {
+    requestAnimationFrame(() => {
+        isReady.value = true;
+    });
     await loadAuth();
+    await loadProfile();
     await loadFriends();
     await loadRequests();
     window.addEventListener('click', handleDocumentClick);
@@ -678,6 +1037,11 @@ onBeforeUnmount(() => {
     window.removeEventListener('click', handleDocumentClick);
     if (pollTimers.friends) clearInterval(pollTimers.friends);
     if (pollTimers.messages) clearInterval(pollTimers.messages);
+    if (pollTimers.profile) clearInterval(pollTimers.profile);
+    if (profileHideTimer) {
+        clearTimeout(profileHideTimer);
+        profileHideTimer = null;
+    }
     if (pollTimers.requests) clearInterval(pollTimers.requests);
 });
 </script>
@@ -688,6 +1052,14 @@ onBeforeUnmount(() => {
     background: radial-gradient(circle at top left, #f5fbff, #eef5ff 45%, #e8f1ff);
     position: relative;
     overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    transition: opacity 280ms ease, transform 320ms ease;
+}
+
+.app-shell.app-enter {
+    opacity: 1;
+    transform: translateY(0) scale(1);
 }
 
 .app-shell::before,
@@ -777,6 +1149,11 @@ onBeforeUnmount(() => {
     gap: 16px;
 }
 
+.user-card-wrap {
+    position: relative;
+    -webkit-app-region: no-drag;
+}
+
 .user-card {
     display: flex;
     align-items: center;
@@ -797,11 +1174,231 @@ onBeforeUnmount(() => {
     font-weight: 600;
     display: grid;
     place-items: center;
+    -webkit-app-region: no-drag;
 }
 
 .user-meta {
     display: grid;
     gap: 2px;
+}
+
+.profile-popover {
+    position: absolute;
+    top: 44px;
+    right: 0;
+    width: 320px;
+    height: 360px;
+    background: linear-gradient(145deg, #ffffff, #f2f5fb);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 18px 48px rgba(22, 32, 52, 0.16);
+    border: 1px solid rgba(31, 65, 120, 0.12);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 180ms ease, transform 220ms ease;
+    pointer-events: none;
+    z-index: 20;
+    -webkit-app-region: no-drag;
+}
+
+.profile-popover.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.profile-head {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.profile-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.profile-meta {
+    display: grid;
+    gap: 6px;
+}
+
+.profile-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1c2436;
+}
+
+.profile-uid {
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.6);
+}
+
+.profile-signature {
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.7);
+    line-height: 1.4;
+}
+
+.profile-details {
+    display: grid;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.65);
+}
+
+.profile-detail {
+    line-height: 1.4;
+}
+
+.profile-actions {
+    margin-top: auto;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    -webkit-app-region: no-drag;
+}
+
+.profile-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 18px;
+    background: #1d4ed8;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+}
+
+.profile-btn.ghost {
+    background: rgba(29, 78, 216, 0.12);
+    color: #1d4ed8;
+}
+
+.profile-btn.ghost:hover {
+    background: rgba(220, 38, 38, 0.16);
+    color: #dc2626;
+}
+
+.profile-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+}
+
+.profile-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.25);
+    backdrop-filter: blur(4px);
+}
+
+.profile-modal__panel {
+    position: relative;
+    width: 520px;
+    max-width: calc(100vw - 32px);
+    background: #f7f9ff;
+    border-radius: 18px;
+    border: 1px solid rgba(31, 65, 120, 0.12);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+    padding: 20px 22px 18px;
+    z-index: 1;
+    -webkit-app-region: no-drag;
+}
+
+.profile-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.profile-modal__title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1c2436;
+}
+
+.profile-modal__close {
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.profile-modal__body {
+    display: grid;
+    gap: 12px;
+}
+
+.profile-modal__avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 20px;
+    margin: 0 auto 6px;
+}
+
+.profile-field {
+    display: grid;
+    gap: 6px;
+}
+
+.profile-field__label {
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.65);
+}
+
+.profile-field__control {
+    position: relative;
+}
+
+.profile-field__control input {
+    width: 100%;
+}
+
+.profile-field__count {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: rgba(28, 36, 54, 0.5);
+}
+
+.profile-field select,
+.profile-field input[type="date"] {
+    width: 100%;
+}
+
+.profile-field--split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.profile-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 16px;
 }
 
 .user-name {
@@ -939,6 +1536,9 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: 18px;
     box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 260ms ease 60ms, transform 320ms ease 60ms;
 }
 
 .chat-sidebar,
@@ -1186,6 +1786,7 @@ onBeforeUnmount(() => {
     text-overflow: ellipsis;
 }
 
+
 .empty-state {
     font-size: 12px;
     color: var(--ink-soft);
@@ -1201,6 +1802,9 @@ onBeforeUnmount(() => {
     flex-direction: column;
     min-height: 0;
     box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 280ms ease 120ms, transform 360ms ease 120ms;
 }
 
 .chat-panel,
@@ -1368,6 +1972,12 @@ onBeforeUnmount(() => {
     justify-content: space-between;
 }
 
+.app-shell.app-enter .sidebar,
+.app-shell.app-enter .chat {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .chat-title {
     font-size: 18px;
     font-weight: 700;
@@ -1392,6 +2002,11 @@ onBeforeUnmount(() => {
     border-radius: 999px;
     background: rgba(72, 147, 214, 0.16);
     color: #1d4ed8;
+}
+
+.chip.offline {
+    background: rgba(148, 163, 184, 0.2);
+    color: #64748b;
 }
 
 .chat-body {

@@ -58,6 +58,14 @@ const resolveFriend = (users, payload = {}) => {
   return null;
 };
 
+const isUserOnline = (user) => {
+  if (!user?.online) return false;
+  if (!user?.token) return false;
+  const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
+  if (!expiresAt || Number.isNaN(expiresAt)) return false;
+  return Date.now() <= expiresAt;
+};
+
 const ensureFriendRequests = (user) => {
   if (!user.friendRequests || typeof user.friendRequests !== 'object') {
     user.friendRequests = { incoming: [], outgoing: [] };
@@ -234,6 +242,7 @@ router.get('/list', authenticate, async (req, res) => {
       uid: item.uid,
       username: item.username,
       avatar: item.avatar || '',
+      online: isUserOnline(item),
     }));
   res.json({ success: true, friends });
 });
@@ -387,6 +396,7 @@ router.get('/search', authenticate, async (req, res) => {
       uid: target.uid,
       username: target.username,
       avatar: target.avatar || '',
+      online: isUserOnline(target),
     },
   });
 });

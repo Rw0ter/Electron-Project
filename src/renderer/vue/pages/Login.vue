@@ -40,7 +40,7 @@
         <span class="radio"></span>
         <span class="a-text">
           已阅读并同意
-          <a href="#" @click.prevent>服务协议</a>和<a href="#" @click.prevent>信技隐私保护指引</a>
+          <a href="#" draggable="false" @dragstart.prevent @click.prevent>服务协议</a>和<a href="#" draggable="false" @dragstart.prevent @click.prevent>信技隐私保护指引</a>
         </span>
       </label>
 
@@ -53,9 +53,9 @@
 
               <!-- 底部链接 -->
       <div class="bottom-links">
-        <a href="#" @click.prevent>扫码登录</a>
+        <a href="#" draggable="false" @dragstart.prevent @click.prevent>扫码登录</a>
         <span class="sep">|</span>
-        <a href="#" @click.prevent="toggleMode">
+        <a href="#" draggable="false" @dragstart.prevent @click.prevent="toggleMode">
           {{ mode === 'login' ? '注册账号' : '返回登录' }}
         </a>
       </div>
@@ -148,10 +148,23 @@ const handleSubmit = async () => {
                     token: result.token,
                     tokenExpiresAt: result.tokenExpiresAt,
                     uid: result.uid,
-                    username: form.username
+                    username: form.username,
+                    nickname: result.nickname,
+                    signature: result.signature,
+                    gender: result.gender,
+                    birthday: result.birthday,
+                    country: result.country,
+                    province: result.province,
+                    region: result.region
                 });
                 try {
                     localStorage.setItem('vp_username', form.username);
+                    if (typeof result.nickname === 'string') {
+                        localStorage.setItem('vp_nickname', result.nickname);
+                    }
+                    if (typeof result.signature === 'string') {
+                        localStorage.setItem('vp_signature', result.signature);
+                    }
                 } catch {}
             }
             await window.electronAPI?.loginSuccess?.();
@@ -194,6 +207,9 @@ const handleSubmit = async () => {
     position: relative;
     width: 100%;
     height: 100%;
+}
+.login-root a {
+    text-decoration: none;
 }
 
 .bg {
@@ -304,6 +320,7 @@ const handleSubmit = async () => {
     position: fixed;
     top: 55px;
     text-align: center;
+    user-select: none;
 }
 
 .card {
@@ -317,6 +334,7 @@ const handleSubmit = async () => {
     position: relative;
     z-index: 2;
     justify-content: space-around;
+    user-select: none;
 }
 
 h2 {
@@ -328,6 +346,9 @@ input::placeholder{
     color: rgb(168, 168, 168);
     text-align: center;
     font-size: 16px;
+}
+input:focus::placeholder{
+    color: transparent;
 }
 
 
@@ -345,9 +366,9 @@ margin-left: 20px;
 margin-bottom: 20px;
 text-align: center;
 font-size: 20px;
-caret-color: transparent; /* 隐藏光标 */
 padding-left: 20px;
 padding-right: 20px;
+    user-select: text;
 }
 
 .submit-btn {
@@ -361,6 +382,7 @@ padding-right: 20px;
     font-weight: 500;
     cursor: pointer;
     margin-top: 22px;
+    user-select: none;
 }
 
 .note{
@@ -370,6 +392,7 @@ padding-right: 20px;
   text-align: center;
 
   min-height: 20px;
+  user-select: none;
 }
 
 #titlebar {
@@ -513,6 +536,7 @@ padding-right: 20px;
     left: 93px;
   text-align: center;
   font-size: 14px;
+  user-select: none;
 }
 .bottom-links a {
   color: #64a8ff;

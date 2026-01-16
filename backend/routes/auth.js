@@ -16,8 +16,58 @@ const router = express.Router();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const loginAttempts = new Map();
+const DEFAULT_SIGNATURE = '这个人很神秘，暂未填写签名';
+const MAX_NICKNAME_LEN = 36;
+const MAX_SIGNATURE_LEN = 80;
 
 const normalizeUsername = (value) => value.trim().toLowerCase();
+
+const extractToken = (req) => {
+  const header = req.headers.authorization || '';
+  if (header.toLowerCase().startsWith('bearer ')) {
+    return header.slice(7).trim();
+  }
+  return req.body?.token || req.query?.token || '';
+};
+
+const authenticate = async (req, res, next) => {
+  const token = extractToken(req);
+  if (!token) {
+    res.status(401).json({ success: false, message: 'Missing token.' });
+    return;
+  }
+
+  const users = await readUsers();
+  const userIndex = users.findIndex((user) => user.token === token);
+  if (userIndex === -1) {
+    res.status(401).json({ success: false, message: 'Invalid token.' });
+    return;
+  }
+
+  const user = users[userIndex];
+  const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
+  if (!expiresAt || Number.isNaN(expiresAt) || Date.now() > expiresAt) {
+    users[userIndex] = {
+      ...user,
+      token: null,
+      tokenExpiresAt: null,
+    };
+    await writeUsers(users);
+    res.status(401).json({ success: false, message: 'Token expired.' });
+    return;
+  }
+
+  req.auth = { user, userIndex, users };
+  next();
+};
+
+const clearUserSession = async (users, userIndex) => {
+  users[userIndex] = {
+    ...users[userIndex],
+    online: false,
+  };
+  await writeUsers(users);
+};
 
 const ensureStorage = async () => {
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -71,6 +121,36 @@ const ensureUserDefaults = async (users) => {
       user.friends = [];
       updated = true;
     }
+    if (typeof user.signature !== 'string') {
+      user.signature = DEFAULT_SIGNATURE;
+      updated = true;
+    }
+    if (typeof user.online !== 'boolean') {
+      user.online = false;
+      updated = true;
+    }
+    if (typeof user.nickname !== 'string') {
+      user.nickname = user.username || '';
+      updated = true;
+    }
+    if (typeof user.gender !== 'string') {
+      user.gender = '';
+      updated = true;
+    }
+    if (typeof user.birthday !== 'string') {
+      user.birthday = '';
+      updated = true;
+    }
+    if (typeof user.country !== 'string') {
+      user.country = '';
+      updated = true;
+    }
+    if (typeof user.province !== 'string') {
+      user.province = '';
+      updated = true;
+    }
+    if (typeof user.region !== 'string') {
+      user.region = '';
     if (!user.friendRequests || typeof user.friendRequests !== 'object') {
       user.friendRequests = { incoming: [], outgoing: [] };
       updated = true;
@@ -201,6 +281,13 @@ router.post('/register', async (req, res) => {
       ...hashed,
       createdAt: new Date().toISOString(),
       friends: [],
+      signature: DEFAULT_SIGNATURE,
+      nickname: trimmedUsername,
+      gender: '',
+      birthday: '',
+      country: '',
+      province: '',
+      region: '',
     });
     await writeUsers(users);
     res.json({ success: true, message: '注册成功，请登录。' });
@@ -226,7 +313,7 @@ router.post('/login', async (req, res) => {
 
     const normalized = normalizeUsername(trimmedUsername);
     const lockKey = `${req.ip}-${normalized}`;
-    if (isLockedOut(lockKey)) {
+  if (isLockedOut(lockKey)) {
       res.status(429).json({
         success: false,
         message: '尝试次数过多，请稍后再试。',
@@ -234,9 +321,9 @@ router.post('/login', async (req, res) => {
       return;
     }
 
-    const users = await readUsers();
-    const userIndex = users.findIndex((user) => user.username === normalized);
-    const user = users[userIndex];
+  const users = await readUsers();
+  const userIndex = users.findIndex((user) => user.username === normalized);
+  const user = users[userIndex];
     const isLegacy = user && user.password;
     const isMatch = user
       ? isLegacy
@@ -260,19 +347,27 @@ router.post('/login', async (req, res) => {
         ...hashed,
         createdAt: user.createdAt || new Date().toISOString(),
         friends: Array.isArray(user.friends) ? user.friends : [],
+        signature: typeof user.signature === 'string' ? user.signature : '',
+        nickname: typeof user.nickname === 'string' ? user.nickname : normalized,
+        gender: typeof user.gender === 'string' ? user.gender : '',
+        birthday: typeof user.birthday === 'string' ? user.birthday : '',
+        country: typeof user.country === 'string' ? user.country : '',
+        province: typeof user.province === 'string' ? user.province : '',
+        region: typeof user.region === 'string' ? user.region : '',
         migratedAt: new Date().toISOString(),
       };
       await writeUsers(users);
     }
 
-    const { token, expiresAt } = issueToken();
-    users[userIndex] = {
-      ...users[userIndex],
-      token,
-      tokenExpiresAt: expiresAt,
-      lastLoginAt: new Date().toISOString(),
-    };
-    await writeUsers(users);
+  const { token, expiresAt } = issueToken();
+  users[userIndex] = {
+    ...users[userIndex],
+    token,
+    tokenExpiresAt: expiresAt,
+    lastLoginAt: new Date().toISOString(),
+    online: true,
+  };
+  await writeUsers(users);
 
     res.json({
       success: true,
@@ -280,11 +375,91 @@ router.post('/login', async (req, res) => {
       token,
       tokenExpiresAt: expiresAt,
       uid: users[userIndex].uid,
+      username: users[userIndex].username,
+      nickname: users[userIndex].nickname || users[userIndex].username,
+      signature: users[userIndex].signature || '',
+      gender: users[userIndex].gender || '',
+      birthday: users[userIndex].birthday || '',
+      country: users[userIndex].country || '',
+      province: users[userIndex].province || '',
+      region: users[userIndex].region || '',
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: '登录失败，请稍后重试。' });
   }
+});
+
+router.post('/logout', authenticate, async (req, res) => {
+  const { users, userIndex } = req.auth;
+  await clearUserSession(users, userIndex);
+  res.json({ success: true });
+});
+
+router.get('/profile', authenticate, async (req, res) => {
+  const { user } = req.auth;
+  res.json({
+    success: true,
+    user: {
+      uid: user.uid,
+      username: user.username,
+      nickname: user.nickname || user.username,
+      signature: user.signature || DEFAULT_SIGNATURE,
+      gender: user.gender || '',
+      birthday: user.birthday || '',
+      country: user.country || '',
+      province: user.province || '',
+      region: user.region || '',
+    },
+  });
+});
+
+router.post('/profile', authenticate, async (req, res) => {
+  const { users, userIndex } = req.auth;
+  const payload = req.body || {};
+  const nickname = typeof payload.nickname === 'string' ? payload.nickname.trim() : '';
+  const signature = typeof payload.signature === 'string' ? payload.signature.trim() : '';
+  const gender = typeof payload.gender === 'string' ? payload.gender.trim() : '';
+  const birthday = typeof payload.birthday === 'string' ? payload.birthday.trim() : '';
+  const country = typeof payload.country === 'string' ? payload.country.trim() : '';
+  const province = typeof payload.province === 'string' ? payload.province.trim() : '';
+  const region = typeof payload.region === 'string' ? payload.region.trim() : '';
+
+  if (nickname.length > MAX_NICKNAME_LEN) {
+    res.status(400).json({ success: false, message: '昵称长度过长。' });
+    return;
+  }
+  if (signature.length > MAX_SIGNATURE_LEN) {
+    res.status(400).json({ success: false, message: '个签长度过长。' });
+    return;
+  }
+
+  users[userIndex] = {
+    ...users[userIndex],
+    nickname: nickname || users[userIndex].nickname || users[userIndex].username,
+    signature: signature || DEFAULT_SIGNATURE,
+    gender,
+    birthday,
+    country,
+    province,
+    region,
+  };
+  await writeUsers(users);
+
+  res.json({
+    success: true,
+    user: {
+      uid: users[userIndex].uid,
+      username: users[userIndex].username,
+      nickname: users[userIndex].nickname || users[userIndex].username,
+      signature: users[userIndex].signature || DEFAULT_SIGNATURE,
+      gender: users[userIndex].gender || '',
+      birthday: users[userIndex].birthday || '',
+      country: users[userIndex].country || '',
+      province: users[userIndex].province || '',
+      region: users[userIndex].region || '',
+    },
+  });
 });
 
 export { ensureStorage, readUsers, writeUsers };
