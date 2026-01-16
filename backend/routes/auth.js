@@ -52,7 +52,7 @@ const authenticate = async (req, res, next) => {
       token: null,
       tokenExpiresAt: null,
     };
-    await writeUsers(users);
+  await writeUsers(users);
     res.status(401).json({ success: false, message: 'Token expired.' });
     return;
   }
@@ -151,6 +151,8 @@ const ensureUserDefaults = async (users) => {
     }
     if (typeof user.region !== 'string') {
       user.region = '';
+      updated = true;
+    }
     if (!user.friendRequests || typeof user.friendRequests !== 'object') {
       user.friendRequests = { incoming: [], outgoing: [] };
       updated = true;
@@ -266,7 +268,7 @@ router.post('/register', async (req, res) => {
       return;
     }
 
-    const users = await readUsers();
+  const users = await readUsers();
     const normalized = normalizeUsername(trimmedUsername);
     if (users.some((user) => user.username === normalized)) {
       res.status(409).json({ success: false, message: '用户名已存在。' });
@@ -313,7 +315,7 @@ router.post('/login', async (req, res) => {
 
     const normalized = normalizeUsername(trimmedUsername);
     const lockKey = `${req.ip}-${normalized}`;
-  if (isLockedOut(lockKey)) {
+    if (isLockedOut(lockKey)) {
       res.status(429).json({
         success: false,
         message: '尝试次数过多，请稍后再试。',
@@ -321,9 +323,9 @@ router.post('/login', async (req, res) => {
       return;
     }
 
-  const users = await readUsers();
-  const userIndex = users.findIndex((user) => user.username === normalized);
-  const user = users[userIndex];
+    const users = await readUsers();
+    const userIndex = users.findIndex((user) => user.username === normalized);
+    const user = users[userIndex];
     const isLegacy = user && user.password;
     const isMatch = user
       ? isLegacy
@@ -359,15 +361,15 @@ router.post('/login', async (req, res) => {
       await writeUsers(users);
     }
 
-  const { token, expiresAt } = issueToken();
-  users[userIndex] = {
-    ...users[userIndex],
-    token,
-    tokenExpiresAt: expiresAt,
-    lastLoginAt: new Date().toISOString(),
-    online: true,
-  };
-  await writeUsers(users);
+    const { token, expiresAt } = issueToken();
+    users[userIndex] = {
+      ...users[userIndex],
+      token,
+      tokenExpiresAt: expiresAt,
+      lastLoginAt: new Date().toISOString(),
+      online: true,
+    };
+    await writeUsers(users);
 
     res.json({
       success: true,

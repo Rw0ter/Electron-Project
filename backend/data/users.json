@@ -13,10 +13,20 @@
       100000002
     ],
     "signature": "这个人很神秘，暂未填写签名",
-    "token": "a92bfa4aed01bd9e975ae93e3e8a3fa852d3df588bccff6ca110ed6044e2f290",
-    "tokenExpiresAt": "2026-07-15T23:41:09.440Z",
-    "lastLoginAt": "2026-01-15T23:41:09.440Z",
-    "online": true
+    "token": "50e4350e25276f3c55d19ed59446f2c9fdc5ab69c7c9d65dc8d7384927d0e270",
+    "tokenExpiresAt": "2026-07-16T03:35:50.113Z",
+    "lastLoginAt": "2026-01-16T03:35:50.113Z",
+    "online": true,
+    "nickname": "rw0ter",
+    "gender": "",
+    "birthday": "",
+    "country": "",
+    "province": "",
+    "region": "",
+    "friendRequests": {
+      "incoming": [],
+      "outgoing": []
+    }
   },
   {
     "uid": 100000001,
@@ -32,7 +42,17 @@
       100000002
     ],
     "signature": "这个人很神秘，暂未填写签名",
-    "online": false
+    "online": false,
+    "nickname": "demo_user",
+    "gender": "",
+    "birthday": "",
+    "country": "",
+    "province": "",
+    "region": "",
+    "friendRequests": {
+      "incoming": [],
+      "outgoing": []
+    }
   },
   {
     "uid": 100000002,
@@ -51,6 +71,16 @@
     "token": "83b269b8346e01c47e9ecd2a8982137da82774407aa4accc8f81f7b2706fa770",
     "tokenExpiresAt": "2026-07-15T23:40:02.570Z",
     "lastLoginAt": "2026-01-15T23:40:02.570Z",
-    "online": true
+    "online": true,
+    "nickname": "xkitme",
+    "gender": "",
+    "birthday": "",
+    "country": "",
+    "province": "",
+    "region": "",
+    "friendRequests": {
+      "incoming": [],
+      "outgoing": []
+    }
   }
 ]

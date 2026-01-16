@@ -220,8 +220,9 @@
             </aside>
 
             <section class="chat">
-                <div v-if="activeView === 'chat'" class="chat-panel">
-                    <div class="chat-header">
+                <template v-if="activeView === 'chat'">
+                    <div class="chat-panel">
+                        <div class="chat-header">
                         <div>
                             <div class="chat-title">
                                 {{ activeFriend?.username || '选择一个联系人' }}
@@ -230,20 +231,14 @@
                                 {{ activeFriend ? `私聊 · UID ${activeFriend.uid}` : '等待选择聊天对象' }}
                             </div>
                         </div>
-                        <div class="chat-actions">
-                            <span class="chip">private</span>
-                            <span class="chip">online</span>
-                        </div>
-                    </div>
-                    <div class="chat-actions">
+                         <div class="chat-actions">
                         <span class="chip">private</span>
                         <span class="chip" :class="{ offline: !activeFriendOnline }">
                             {{ activeFriendOnline ? 'online' : 'offline' }}
                         </span>
                     </div>
-                </div>
-
-                    <div class="chat-body" ref="chatBodyRef">
+                    </div>
+                     <div class="chat-body" ref="chatBodyRef">
                         <div v-if="loading" class="loading">加载中...</div>
                         <div v-else-if="!messages.length" class="empty-chat">
                             还没有聊天记录，打个招呼吧。
@@ -264,6 +259,10 @@
                             </div>
                         </div>
                     </div>
+                   
+                    </div>
+
+                   
 
                     <div class="composer">
                         <div class="composer-toolbar">
@@ -317,7 +316,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </template>
 
                 <div v-else class="contacts-panel">
                     <div class="contacts-header">
@@ -515,7 +514,7 @@ const showSendMenu = ref(false);
 const pollTimers = {
     friends: null,
     messages: null,
-    profile: null
+    profile: null,
     requests: null
 };
 const lastFriendSignature = ref('');
@@ -628,6 +627,7 @@ const scheduleHideProfile = () => {
         isProfileVisible.value = false;
         profileHideTimer = null;
     }, 120);
+};
 const openContacts = async () => {
     activeView.value = 'contacts';
     await loadRequests({ silent: true });
@@ -2093,6 +2093,7 @@ onBeforeUnmount(() => {
     display: grid;
     gap: 12px;
     flex: 0 0 auto;
+    max-height: 210px;
 }
 
 .composer-toolbar {
