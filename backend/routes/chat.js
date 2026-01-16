@@ -4,7 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import initSqlJs from 'sql.js';
-import { readUsers, writeUsers } from './auth.js';
+import { findUserByToken, readUsers, writeUsers } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -196,34 +196,29 @@ const extractToken = (req) => {
 };
 
 const authenticate = async (req, res, next) => {
-  const token = extractToken(req);
-  if (!token) {
-    res.status(401).json({ success: false, message: 'Missing token.' });
-    return;
-  }
+  try {
+    const token = extractToken(req);
+    if (!token) {
+      res.status(401).json({ success: false, message: 'Missing token.' });
+      return;
+    }
 
-  const users = await readUsers();
-  const userIndex = users.findIndex((user) => user.token === token);
-  if (userIndex === -1) {
-    res.status(401).json({ success: false, message: 'Invalid token.' });
-    return;
-  }
+    const users = await readUsers();
+    const found = findUserByToken(users, token);
+    if (found.touched) {
+      await writeUsers(users);
+    }
+    if (!found.user) {
+      res.status(401).json({ success: false, message: 'Invalid token.' });
+      return;
+    }
 
-  const user = users[userIndex];
-  const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
-  if (!expiresAt || Number.isNaN(expiresAt) || Date.now() > expiresAt) {
-    users[userIndex] = {
-      ...user,
-      token: null,
-      tokenExpiresAt: null,
-    };
-    await writeUsers(users);
-    res.status(401).json({ success: false, message: 'Token expired.' });
-    return;
+    req.auth = { user: found.user, userIndex: found.userIndex, users };
+    next();
+  } catch (error) {
+    console.error('Chat authenticate error:', error);
+    res.status(500).json({ success: false, message: 'Server error.' });
   }
-
-  req.auth = { user, userIndex, users };
-  next();
 };
 
 const toMessage = (row) => {

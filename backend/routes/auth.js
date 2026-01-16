@@ -39,26 +39,16 @@ const authenticate = async (req, res, next) => {
     }
 
     const users = await readUsers();
-    const userIndex = users.findIndex((user) => user.token === token);
-    if (userIndex === -1) {
+    const found = findUserByToken(users, token);
+    if (found.touched) {
+      await writeUsers(users);
+    }
+    if (!found.user) {
       res.status(401).json({ success: false, message: 'Invalid token.' });
       return;
     }
 
-    const user = users[userIndex];
-    const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
-    if (!expiresAt || Number.isNaN(expiresAt) || Date.now() > expiresAt) {
-      users[userIndex] = {
-        ...user,
-        token: null,
-        tokenExpiresAt: null,
-      };
-      await writeUsers(users);
-      res.status(401).json({ success: false, message: 'Token expired.' });
-      return;
-    }
-
-    req.auth = { user, userIndex, users };
+    req.auth = { user: found.user, userIndex: found.userIndex, users };
     next();
   } catch (error) {
     console.error('Authenticate error:', error);
@@ -150,6 +140,36 @@ const ensureUserDefaults = async (users) => {
       user.online = false;
       updated = true;
     }
+    if (!Array.isArray(user.tokens)) {
+      user.tokens = [];
+      updated = true;
+    }
+    if (user.token && user.tokenExpiresAt) {
+      const exists = user.tokens.some((entry) => entry?.token === user.token);
+      if (!exists) {
+        user.tokens.push({ token: user.token, expiresAt: user.tokenExpiresAt });
+        updated = true;
+      }
+    }
+    if (Array.isArray(user.tokens)) {
+      const nextTokens = user.tokens.filter(
+        (entry) =>
+          entry &&
+          typeof entry.token === 'string' &&
+          entry.token &&
+          typeof entry.expiresAt === 'string' &&
+          !isTokenExpired(entry.expiresAt)
+      );
+      if (nextTokens.length !== user.tokens.length) {
+        user.tokens = nextTokens;
+        updated = true;
+      }
+    }
+    if (user.token && isTokenExpired(user.tokenExpiresAt)) {
+      user.token = null;
+      user.tokenExpiresAt = null;
+      updated = true;
+    }
     if (typeof user.nickname !== 'string') {
       user.nickname = user.username || '';
       updated = true;
@@ -210,6 +230,71 @@ const issueToken = () => {
     Date.now() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
   return { token, expiresAt };
+};
+
+const isTokenExpired = (expiresAt) => {
+  const ts = expiresAt ? Date.parse(expiresAt) : 0;
+  if (!ts || Number.isNaN(ts)) return true;
+  return Date.now() > ts;
+};
+
+const removeTokenFromUser = (user, token) => {
+  if (!user || !token) return false;
+  let changed = false;
+  if (Array.isArray(user.tokens)) {
+    const next = user.tokens.filter((entry) => entry?.token !== token);
+    if (next.length !== user.tokens.length) {
+      user.tokens = next;
+      changed = true;
+    }
+  }
+  if (user.token === token) {
+    user.token = null;
+    user.tokenExpiresAt = null;
+    changed = true;
+  }
+  return changed;
+};
+
+const findUserByToken = (users, token) => {
+  if (!token) return { user: null, userIndex: -1, touched: false };
+  let touched = false;
+  for (let i = 0; i < users.length; i += 1) {
+    const user = users[i];
+    const tokens = Array.isArray(user.tokens) ? user.tokens : [];
+    const entry = tokens.find((item) => item?.token === token);
+    if (entry) {
+      if (isTokenExpired(entry.expiresAt)) {
+        if (removeTokenFromUser(user, token)) {
+          touched = true;
+        }
+        return { user: null, userIndex: -1, touched };
+      }
+      return { user, userIndex: i, touched };
+    }
+    if (user.token === token) {
+      if (isTokenExpired(user.tokenExpiresAt)) {
+        if (removeTokenFromUser(user, token)) {
+          touched = true;
+        }
+        return { user: null, userIndex: -1, touched };
+      }
+      return { user, userIndex: i, touched };
+    }
+  }
+  return { user: null, userIndex: -1, touched };
+};
+
+const hasValidToken = (user) => {
+  if (!user) return false;
+  const tokens = Array.isArray(user.tokens) ? user.tokens : [];
+  if (tokens.some((entry) => entry?.token && !isTokenExpired(entry.expiresAt))) {
+    return true;
+  }
+  if (user.token && !isTokenExpired(user.tokenExpiresAt)) {
+    return true;
+  }
+  return false;
 };
 
 const hashPassword = (password, salt = crypto.randomBytes(16)) => {
@@ -383,10 +468,15 @@ router.post('/login', async (req, res) => {
     }
 
     const { token, expiresAt } = issueToken();
+    const existingTokens = Array.isArray(users[userIndex].tokens)
+      ? users[userIndex].tokens.filter((entry) => entry?.token !== token)
+      : [];
+    existingTokens.push({ token, expiresAt });
     users[userIndex] = {
       ...users[userIndex],
       token,
       tokenExpiresAt: expiresAt,
+      tokens: existingTokens,
       lastLoginAt: new Date().toISOString(),
       online: false,
     };
@@ -414,7 +504,14 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', authenticate, async (req, res) => {
+  const token = extractToken(req);
   const { users, userIndex } = req.auth;
+  if (token) {
+    const updated = removeTokenFromUser(users[userIndex], token);
+    if (updated) {
+      await writeUsers(users);
+    }
+  }
   await clearUserSession(users, userIndex);
   res.json({ success: true });
 });
@@ -485,5 +582,5 @@ router.post('/profile', authenticate, async (req, res) => {
   });
 });
 
-export { ensureStorage, readUsers, writeUsers };
+export { ensureStorage, readUsers, writeUsers, findUserByToken, hasValidToken };
 export default router;

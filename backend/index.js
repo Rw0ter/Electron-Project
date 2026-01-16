@@ -3,7 +3,12 @@ import http from 'http';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { WebSocket, WebSocketServer } from 'ws';
-import authRouter, { ensureStorage, readUsers, writeUsers } from './routes/auth.js';
+import authRouter, {
+  ensureStorage,
+  findUserByToken,
+  readUsers,
+  writeUsers,
+} from './routes/auth.js';
 import chatRouter, { ensureChatStorage, setChatNotifier } from './routes/chat.js';
 import friendsRouter, { setFriendsNotifier } from './routes/friends.js';
 import {
@@ -407,22 +412,11 @@ export function startServer(port = PORT) {
   const verifyToken = async (token) => {
     if (!token) return null;
     const users = await readUsers();
-    const userIndex = users.findIndex((user) => user.token === token);
-    if (userIndex === -1) {
-      return null;
-    }
-    const user = users[userIndex];
-    const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
-    if (!expiresAt || Number.isNaN(expiresAt) || Date.now() > expiresAt) {
-      users[userIndex] = {
-        ...user,
-        token: null,
-        tokenExpiresAt: null,
-      };
+    const found = findUserByToken(users, token);
+    if (found.touched) {
       await writeUsers(users);
-      return null;
     }
-    return user;
+    return found.user || null;
   };
 
   const updateUserOnlineState = async (uid, online) => {
@@ -475,6 +469,19 @@ export function startServer(port = PORT) {
   });
   startHeartbeatMonitor();
 
+  const sendPresenceSnapshot = async (socket, user) => {
+    try {
+      const users = await readUsers();
+      const friendSet = new Set(user.friends || []);
+      const snapshot = users
+        .filter((item) => friendSet.has(item.uid))
+        .map((item) => ({ uid: item.uid, online: isUserOnline(item) }));
+      socket.send(JSON.stringify({ type: 'presence_snapshot', data: snapshot }));
+    } catch (error) {
+      console.error('Presence snapshot error:', error);
+    }
+  };
+
   wss.on('connection', async (socket, req) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
@@ -484,6 +491,7 @@ export function startServer(port = PORT) {
         socket.close(1008, 'Unauthorized');
         return;
       }
+      socket._user = user;
       socket._uid = user.uid;
       addConnection(user.uid, socket);
       const statusChanged = touchHeartbeat(user.uid);
@@ -491,22 +499,18 @@ export function startServer(port = PORT) {
         void updateUserOnlineState(user.uid, true);
       }
       socket.send(JSON.stringify({ type: 'ready', uid: user.uid }));
-      try {
-        const users = await readUsers();
-        const friendSet = new Set(user.friends || []);
-        const snapshot = users
-          .filter((item) => friendSet.has(item.uid))
-          .map((item) => ({ uid: item.uid, online: isUserOnline(item) }));
-        socket.send(JSON.stringify({ type: 'presence_snapshot', data: snapshot }));
-      } catch (error) {
-        console.error('Presence snapshot error:', error);
-      }
+      await sendPresenceSnapshot(socket, user);
       socket.on('message', (raw) => {
         try {
           const text = raw?.toString?.() || '';
           const message = JSON.parse(text);
           if (message?.type === 'heartbeat') {
             touchHeartbeat(user.uid);
+            return;
+          }
+          if (message?.type === 'presence_request') {
+            void sendPresenceSnapshot(socket, user);
+            return;
           }
         } catch {}
       });

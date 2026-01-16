@@ -1,5 +1,5 @@
 import express from 'express';
-import { readUsers, writeUsers } from './auth.js';
+import { findUserByToken, hasValidToken, readUsers, writeUsers } from './auth.js';
 import { isUserOnline as isOnline } from '../online.js';
 
 const router = express.Router();
@@ -26,26 +26,16 @@ const authenticate = async (req, res, next) => {
     }
 
     const users = await readUsers();
-    const userIndex = users.findIndex((user) => user.token === token);
-    if (userIndex === -1) {
+    const found = findUserByToken(users, token);
+    if (found.touched) {
+      await writeUsers(users);
+    }
+    if (!found.user) {
       res.status(401).json({ success: false, message: 'Invalid token.' });
       return;
     }
 
-    const user = users[userIndex];
-    const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
-    if (!expiresAt || Number.isNaN(expiresAt) || Date.now() > expiresAt) {
-      users[userIndex] = {
-        ...user,
-        token: null,
-        tokenExpiresAt: null,
-      };
-      await writeUsers(users);
-      res.status(401).json({ success: false, message: 'Token expired.' });
-      return;
-    }
-
-    req.auth = { user, userIndex, users };
+    req.auth = { user: found.user, userIndex: found.userIndex, users };
     next();
   } catch (error) {
     console.error('Friends authenticate error:', error);
@@ -67,10 +57,7 @@ const resolveFriend = (users, payload = {}) => {
 
 const isUserOnline = (user) => {
   if (!isOnline(user)) return false;
-  if (!user?.token) return false;
-  const expiresAt = user.tokenExpiresAt ? Date.parse(user.tokenExpiresAt) : 0;
-  if (!expiresAt || Number.isNaN(expiresAt)) return false;
-  return Date.now() <= expiresAt;
+  return hasValidToken(user);
 };
 
 const ensureFriendRequests = (user) => {

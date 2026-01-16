@@ -516,7 +516,9 @@ let wsReconnectTimer = null;
 let wsReconnectAttempts = 0;
 let wsHeartbeatTimer = null;
 const HEARTBEAT_INTERVAL_MS = 15000;
-const pendingPresence = new Map();
+let wsPresenceTimer = null;
+const PRESENCE_REQUEST_INTERVAL_MS = 10000;
+const presenceOverrides = new Map();
 let messageIdSet = new Set();
 const lastFriendSignature = ref('');
 const lastMessageSignature = ref('');
@@ -673,6 +675,10 @@ const closeWebSocket = () => {
         clearInterval(wsHeartbeatTimer);
         wsHeartbeatTimer = null;
     }
+    if (wsPresenceTimer) {
+        clearInterval(wsPresenceTimer);
+        wsPresenceTimer = null;
+    }
     if (wsRef.value) {
         wsRef.value.onopen = null;
         wsRef.value.onclose = null;
@@ -765,8 +771,14 @@ const connectWebSocket = () => {
                 ws.send(JSON.stringify({ type: 'heartbeat' }));
             }
         }, HEARTBEAT_INTERVAL_MS);
+        wsPresenceTimer = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'presence_request' }));
+            }
+        }, PRESENCE_REQUEST_INTERVAL_MS);
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'heartbeat' }));
+            ws.send(JSON.stringify({ type: 'presence_request' }));
         }
         loadFriends({ silent: true });
         loadRequests({ silent: true });
@@ -779,6 +791,10 @@ const connectWebSocket = () => {
         if (wsHeartbeatTimer) {
             clearInterval(wsHeartbeatTimer);
             wsHeartbeatTimer = null;
+        }
+        if (wsPresenceTimer) {
+            clearInterval(wsPresenceTimer);
+            wsPresenceTimer = null;
         }
         scheduleReconnect();
     };
@@ -1018,9 +1034,9 @@ const applyPresenceUpdate = (entry) => {
     const uid = Number(entry?.uid);
     if (!Number.isInteger(uid)) return;
     const online = entry?.online === true;
+    presenceOverrides.set(uid, online);
     const index = friends.value.findIndex((item) => item.uid === uid);
     if (index === -1) {
-        pendingPresence.set(uid, online);
         return;
     }
     if (friends.value[index].online === online) return;
@@ -1050,13 +1066,12 @@ const loadFriends = async ({ silent } = {}) => {
         const data = await res.json();
         if (res.ok && data?.success) {
             const next = data.friends || [];
-            if (pendingPresence.size) {
+            if (presenceOverrides.size) {
                 next.forEach((item) => {
-                    if (pendingPresence.has(item.uid)) {
-                        item.online = pendingPresence.get(item.uid) === true;
+                    if (presenceOverrides.has(item.uid)) {
+                        item.online = presenceOverrides.get(item.uid) === true;
                     }
                 });
-                pendingPresence.clear();
             }
             const signature = buildFriendSignature(next);
             if (signature !== lastFriendSignature.value) {
