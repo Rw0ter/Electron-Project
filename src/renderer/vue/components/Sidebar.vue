@@ -122,7 +122,7 @@ html[data-theme="light"] #leftCard a.active:hover {
     background: rgb(190 182 240 / 32%);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border-radius: var(--radius-lg);
+    border-radius: 0 0 12px 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 

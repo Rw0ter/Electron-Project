@@ -1159,7 +1159,7 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 10px;
     padding: 6px 10px;
-    border-radius: 12px;
+    border-radius: 0 0 12px 12px;
     background: var(--panel-soft);
     border: 1px solid var(--line);
 }
