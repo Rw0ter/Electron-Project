@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loginSuccess: () => ipcRenderer.send('login-success'),
     setAuthToken: (payload) => ipcRenderer.invoke('set-auth-token', payload),
     getAuthToken: () => ipcRenderer.invoke('get-auth-token'),
+    logout: () => ipcRenderer.send('logout'),
     openFoundFriend: () => ipcRenderer.send('open-found-friend'),
     windowClose: () => ipcRenderer.send('window-close'),
     windowMin: () => ipcRenderer.send('window-min'),

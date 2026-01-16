@@ -12,9 +12,11 @@
       100000001,
       100000002
     ],
-    "token": "3ded2abee9e8e8df1de28b70e8245c7f959848b15a7893fa9dd02afa2af479c6",
-    "tokenExpiresAt": "2026-07-15T11:36:38.534Z",
-    "lastLoginAt": "2026-01-15T11:36:38.534Z"
+    "signature": "这个人很神秘，暂未填写签名",
+    "token": "a92bfa4aed01bd9e975ae93e3e8a3fa852d3df588bccff6ca110ed6044e2f290",
+    "tokenExpiresAt": "2026-07-15T23:41:09.440Z",
+    "lastLoginAt": "2026-01-15T23:41:09.440Z",
+    "online": true
   },
   {
     "uid": 100000001,
@@ -26,23 +28,29 @@
     "digest": "sha512",
     "createdAt": "2026-01-15T07:56:54.217Z",
     "friends": [
-      100000000
-    ]
+      100000000,
+      100000002
+    ],
+    "signature": "这个人很神秘，暂未填写签名",
+    "online": false
   },
   {
     "uid": 100000002,
     "username": "xkitme",
-    "passwordHash": "4393bfcc9ca41d08ecb6336ee69469b3ed14ba7f489402ca7cc78bf2dc9e673a5e84f97e2d55b08a0d4cfda636d10c57f8159b96612316d7f99cc87e0b9579cb",
-    "salt": "628a498600d3890beb82bd146ae3cf46",
+    "passwordHash": "2488cb3eba5ce33b8b896df100eaff1ee8dff52f915ab47b019dc31418dc2bb247d271aa834195baae6a34dedab8ad88a369cb0cb2bcb274bcd31bd4a93a7299",
+    "salt": "0153c7a51ae9ea4da634478e839808bf",
     "iterations": 120000,
     "keylen": 64,
     "digest": "sha512",
-    "createdAt": "2026-01-15T11:27:32.817Z",
+    "createdAt": "2026-01-15T13:11:38.753Z",
     "friends": [
+      100000001,
       100000000
     ],
-    "token": "e970187791bc09b8d11df684090058b27424fd3fe4da5e7d924d8cdb2590faa2",
-    "tokenExpiresAt": "2026-07-15T11:36:54.002Z",
-    "lastLoginAt": "2026-01-15T11:36:54.002Z"
+    "signature": "我爱 Taylor",
+    "token": "83b269b8346e01c47e9ecd2a8982137da82774407aa4accc8f81f7b2706fa770",
+    "tokenExpiresAt": "2026-07-15T23:40:02.570Z",
+    "lastLoginAt": "2026-01-15T23:40:02.570Z",
+    "online": true
   }
 ]

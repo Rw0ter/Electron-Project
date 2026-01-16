@@ -14,7 +14,15 @@ let authToken = null;
 let authTokenExpiresAt = null;
 let authUid = null;
 let authUsername = null;
-let win = null;
+let authSignature = null;
+let authNickname = null;
+let authGender = null;
+let authBirthday = null;
+let authCountry = null;
+let authProvince = null;
+let authRegion = null;
+let loginWin = null;
+let mainWin = null;
 let foundFriendWin = null;
 const isDev = process.env.VITE_DEV_SERVER_URL ? true : false;
 
@@ -24,11 +32,6 @@ const getRendererPath = (page) => {
         return `${viteDevServer}/${page}`;
     }
     return path.join(appRoot, 'dist', page);
-};
-
-const loadRendererPage = (page) => {
-    if (!win) return;
-    loadRendererPageFor(win, page);
 };
 
 const loadRendererPageFor = (targetWindow, page) => {
@@ -43,7 +46,7 @@ const loadRendererPageFor = (targetWindow, page) => {
     }
 };
 
-const applyAppMenu = () => {
+const applyAppMenuFor = (targetWindow) => {
     const menu = Menu.buildFromTemplate([
         {
             label: '文件',
@@ -52,7 +55,7 @@ const applyAppMenu = () => {
                     label: '保存',
                     accelerator: 'Ctrl+S',
                     click: () => {
-                        win?.webContents.send('menu-save');
+                        targetWindow?.webContents.send('menu-save');
                     }
                 },
                 { role: 'quit' }
@@ -64,7 +67,7 @@ const applyAppMenu = () => {
 };
 
 function createLoginWindow() {
-    win = new BrowserWindow({
+    loginWin = new BrowserWindow({
         width: 320,
         height: 448,
         frame: false,
@@ -78,10 +81,10 @@ function createLoginWindow() {
     });
 
     Menu.setApplicationMenu(null);
-    loadRendererPage('login.html');
-    if (isDev) {
-        win.webContents.openDevTools({ mode: 'detach' });
-    }
+    loadRendererPageFor(loginWin, 'login.html');
+    loginWin.webContents.once('did-finish-load', () => {
+        loginWin.webContents.openDevTools({ mode: 'detach' });
+    });
 }
 
 function createFoundFriendWindow() {
@@ -112,13 +115,100 @@ function createFoundFriendWindow() {
     });
 }
 
+const fadeWindow = (targetWindow, targetOpacity, durationMs = 160) => {
+    if (!targetWindow || typeof targetWindow.setOpacity !== 'function') return;
+    const startOpacity = targetWindow.getOpacity();
+    const steps = 12;
+    const stepMs = Math.max(10, Math.round(durationMs / steps));
+    let step = 0;
+    const timer = setInterval(() => {
+        if (!targetWindow || targetWindow.isDestroyed()) {
+            clearInterval(timer);
+            return;
+        }
+        step += 1;
+        const t = step / steps;
+        const ease = 1 - Math.pow(1 - t, 2);
+        const opacity = startOpacity + (targetOpacity - startOpacity) * ease;
+        targetWindow.setOpacity(opacity);
+        if (step >= steps) {
+            clearInterval(timer);
+            targetWindow.setOpacity(targetOpacity);
+        }
+    }, stepMs);
+};
+
 const enterMainApp = () => {
-    if (!win) return;
-    win.setResizable(true);
-    win.setSize(900, 600);
-    win.center();
-    applyAppMenu();
-    loadRendererPage('index.html');
+    if (mainWin && !mainWin.isDestroyed()) {
+        mainWin.focus();
+        return;
+    }
+
+    mainWin = new BrowserWindow({
+        width: 900,
+        height: 600,
+        frame: false,
+        titleBarStyle: 'hidden',
+        resizable: true,
+        show: false,
+        backgroundColor: '#eef5ff',
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    applyAppMenuFor(mainWin);
+    loadRendererPageFor(mainWin, 'index.html');
+
+    mainWin.once('ready-to-show', () => {
+        mainWin.setOpacity(0);
+        mainWin.show();
+        fadeWindow(mainWin, 1, 220);
+        mainWin.webContents.openDevTools({ mode: 'detach' });
+    });
+
+    if (loginWin && !loginWin.isDestroyed()) {
+        fadeWindow(loginWin, 0, 140);
+        setTimeout(() => {
+            if (loginWin && !loginWin.isDestroyed()) {
+                loginWin.close();
+            }
+            loginWin = null;
+        }, 180);
+    }
+
+    mainWin.on('closed', () => {
+        mainWin = null;
+    });
+};
+
+const clearAuth = () => {
+    authToken = null;
+    authTokenExpiresAt = null;
+    authUid = null;
+    authUsername = null;
+    authSignature = null;
+    authNickname = null;
+    authGender = null;
+    authBirthday = null;
+    authCountry = null;
+    authProvince = null;
+    authRegion = null;
+};
+
+const logoutToLogin = () => {
+    if (loginWin && !loginWin.isDestroyed()) {
+        loginWin.focus();
+    } else {
+        createLoginWindow();
+    }
+
+    if (mainWin && !mainWin.isDestroyed()) {
+        mainWin.close();
+        mainWin = null;
+    }
 };
 
 ipcMain.handle('save-file', async (event, content) => {
@@ -151,6 +241,13 @@ ipcMain.handle('set-auth-token', async (_, payload = {}) => {
     authTokenExpiresAt = payload.tokenExpiresAt || null;
     authUid = payload.uid || null;
     authUsername = payload.username || null;
+    authSignature = payload.signature || null;
+    authNickname = payload.nickname || null;
+    authGender = payload.gender || null;
+    authBirthday = payload.birthday || null;
+    authCountry = payload.country || null;
+    authProvince = payload.province || null;
+    authRegion = payload.region || null;
     return true;
 });
 
@@ -159,12 +256,24 @@ ipcMain.handle('get-auth-token', async () => {
         token: authToken,
         tokenExpiresAt: authTokenExpiresAt,
         uid: authUid,
-        username: authUsername
+        username: authUsername,
+        signature: authSignature,
+        nickname: authNickname,
+        gender: authGender,
+        birthday: authBirthday,
+        country: authCountry,
+        province: authProvince,
+        region: authRegion
     };
 });
 
 ipcMain.on('login-success', () => {
     enterMainApp();
+});
+
+ipcMain.on('logout', () => {
+    clearAuth();
+    logoutToLogin();
 });
 
 ipcMain.on('open-found-friend', () => {
