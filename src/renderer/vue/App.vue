@@ -517,7 +517,6 @@ let wsReconnectAttempts = 0;
 let messageIdSet = new Set();
 const lastFriendSignature = ref('');
 const lastMessageSignature = ref('');
-const lastNotifiedMessageId = ref('');
 
 const handleMin = () => window.electronAPI?.windowMin?.();
 const handleMax = () => window.electronAPI?.windowMax?.();
@@ -1036,28 +1035,17 @@ const loadMessages = async (targetUid, { silent, forceScroll } = {}) => {
             const signature = buildMessageSignature(next);
             if (signature !== lastMessageSignature.value) {
                 const shouldStick = forceScroll ? true : isAtBottom();
-                const incoming = next.filter(
-                    (msg) => msg.senderUid !== auth.value.uid
-                );
-                if (incoming.length) {
-                    const latestIncoming = incoming[incoming.length - 1];
-                    const latestId = latestIncoming.id || latestIncoming.createdAt || '';
-                    if (latestId && latestId !== lastNotifiedMessageId.value) {
-                        playNotifySound();
-                        lastNotifiedMessageId.value = latestId;
-                    }
-                }
                 messages.value = next;
                 messageIdSet = new Set(next.map((item) => item.id).filter(Boolean));
                 lastMessageSignature.value = signature;
                 if (shouldStick) {
                     await nextTick();
-                    scrollToBottom();
+                    scheduleScrollToBottom();
                 }
             }
             if (forceScroll && signature === lastMessageSignature.value) {
                 await nextTick();
-                scrollToBottom();
+                scheduleScrollToBottom();
             }
         } else {
             if (!silent) {
@@ -1079,9 +1067,11 @@ const loadMessages = async (targetUid, { silent, forceScroll } = {}) => {
     }
 };
 
-const selectFriend = (friend) => {
+const selectFriend = async (friend) => {
     activeFriend.value = friend;
-    loadMessages(friend.uid, { forceScroll: true });
+    await loadMessages(friend.uid, { forceScroll: true });
+    await nextTick();
+    scheduleScrollToBottom();
 };
 
 const sendMessage = async () => {
@@ -1151,6 +1141,12 @@ const scrollToBottom = () => {
     const el = chatBodyRef.value;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
+};
+
+const scheduleScrollToBottom = () => {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(scrollToBottom);
+    });
 };
 
 const sanitizeText = (value) => {
