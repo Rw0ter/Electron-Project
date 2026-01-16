@@ -11,7 +11,13 @@
             </span>
             <span class="select-arrow">&#xE70D;</span>
         </button>
-        <div v-if="isOpen" class="select-menu" @mouseleave="clearPreview" @click.stop>
+        <div
+            v-if="isOpen"
+            ref="menuRef"
+            class="select-menu"
+            @mouseleave="clearPreview"
+            @click.stop
+        >
             <button
                 v-for="option in normalizedOptions"
                 :key="option.value"
@@ -31,7 +37,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
     modelValue: {
@@ -49,13 +55,19 @@ const props = defineProps({
     disabled: {
         type: Boolean,
         default: false
+    },
+    autoScroll: {
+        type: Boolean,
+        default: false
     }
 });
 
 const emit = defineEmits(['update:modelValue']);
 const isOpen = ref(false);
 const rootRef = ref(null);
+const menuRef = ref(null);
 const previewLabel = ref('');
+const instanceId = Math.random().toString(36).slice(2);
 
 const normalizedOptions = computed(() =>
     props.options.map((item) => {
@@ -79,7 +91,18 @@ const displayLabel = computed(() => {
 
 const toggleOpen = () => {
     if (props.disabled) return;
-    isOpen.value = !isOpen.value;
+    const nextOpen = !isOpen.value;
+    if (nextOpen) {
+        window.dispatchEvent(
+            new CustomEvent('select-field:open', { detail: { id: instanceId } })
+        );
+    }
+    isOpen.value = nextOpen;
+    if (isOpen.value && props.autoScroll) {
+        nextTick(() => {
+            ensureMenuInView();
+        });
+    }
 };
 
 const close = () => {
@@ -106,12 +129,52 @@ const handleClickOutside = (event) => {
     }
 };
 
+const handleExternalOpen = (event) => {
+    if (event?.detail?.id !== instanceId) {
+        close();
+    }
+};
+
+const findScrollParent = (node) => {
+    let current = node?.parentElement || null;
+    while (current) {
+        const style = window.getComputedStyle(current);
+        if (
+            /(auto|scroll)/.test(style.overflowY) &&
+            current.scrollHeight > current.clientHeight
+        ) {
+            return current;
+        }
+        current = current.parentElement;
+    }
+    return null;
+};
+
+const ensureMenuInView = () => {
+    const menu = menuRef.value;
+    const root = rootRef.value;
+    if (!menu || !root) return;
+    const scrollParent = findScrollParent(root);
+    if (!scrollParent) return;
+    const menuRect = menu.getBoundingClientRect();
+    const parentRect = scrollParent.getBoundingClientRect();
+    const padding = 8;
+    if (menuRect.bottom > parentRect.bottom) {
+        scrollParent.scrollTop += menuRect.bottom - parentRect.bottom + padding;
+    }
+    if (menuRect.top < parentRect.top) {
+        scrollParent.scrollTop -= parentRect.top - menuRect.top + padding;
+    }
+};
+
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);
+    window.addEventListener('select-field:open', handleExternalOpen);
 });
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleClickOutside);
+    window.removeEventListener('select-field:open', handleExternalOpen);
 });
 </script>
 
@@ -164,11 +227,16 @@ onBeforeUnmount(() => {
     background: #fff;
     border: 1px solid rgba(15, 23, 42, 0.12);
     border-radius: 12px;
-    box-shadow: 0 18px 30px rgba(15, 23, 42, 0.12);
+    box-shadow: none;
     max-height: 260px;
     overflow-y: auto;
     padding: 6px;
     z-index: 10;
+    scrollbar-width: none;
+}
+
+.select-menu::-webkit-scrollbar {
+    display: none;
 }
 
 .select-option {

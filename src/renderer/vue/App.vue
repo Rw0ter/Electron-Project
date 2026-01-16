@@ -390,7 +390,7 @@
                 <div class="profile-modal__body">
                     <div class="profile-modal__avatar">{{ initials }}</div>
 
-                    <label class="profile-field">
+                    <label class="profile-field" :class="{ 'is-invalid': nicknameInvalid }">
                         <span class="profile-field__label">昵称</span>
                         <div class="profile-field__control">
                             <input
@@ -418,17 +418,25 @@
 
                     <label class="profile-field">
                         <span class="profile-field__label">性别</span>
-                        <SelectField v-model="editForm.gender" :options="genderOptions" />
+                        <SelectField
+                            v-model="editForm.gender"
+                            :options="genderOptions"
+                            autoScroll
+                        />
                     </label>
 
                     <label class="profile-field">
                         <span class="profile-field__label">生日</span>
-                        <input v-model="editForm.birthday" type="date" class="profile-field__date" />
+                        <DateSelect v-model="editForm.birthday" />
                     </label>
 
                     <label class="profile-field">
                         <span class="profile-field__label">国家</span>
-                        <SelectField v-model="editForm.country" :options="countryOptions" />
+                        <SelectField
+                            v-model="editForm.country"
+                            :options="countryOptions"
+                            autoScroll
+                        />
                     </label>
 
                     <div
@@ -437,7 +445,11 @@
                     >
                         <label>
                             <span class="profile-field__label">省份</span>
-                            <SelectField v-model="editForm.province" :options="provinceOptions" />
+                        <SelectField
+                            v-model="editForm.province"
+                            :options="provinceOptions"
+                            autoScroll
+                        />
                         </label>
                         <label>
                             <span class="profile-field__label">城市</span>
@@ -445,6 +457,7 @@
                                 v-model="editForm.region"
                                 :options="cityOptions"
                                 :disabled="!cityOptions.length"
+                                autoScroll
                             />
                         </label>
                     </div>
@@ -461,6 +474,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, nextTick, watch } from 'vue';
 import SelectField from './components/SelectField.vue';
+import DateSelect from './components/DateSelect.vue';
 import { COUNTRIES, CHINA_PROVINCES, CHINA_CITIES_BY_PROVINCE } from './utils/geo';
 import { API_BASE } from './utils/api.js';
 const NOTIFY_SOUND_URL = `${API_BASE}/resource/messagenotify.wav`;
@@ -480,6 +494,7 @@ const auth = ref({
 const isReady = ref(false);
 const isProfileVisible = ref(false);
 const isEditOpen = ref(false);
+const nicknameInvalid = ref(false);
 const friends = ref([]);
 const activeFriend = ref(null);
 const messages = ref([]);
@@ -551,18 +566,27 @@ const openEditProfile = () => {
         province: auth.value.province || '',
         region: auth.value.region || ''
     };
+    nicknameInvalid.value = false;
     isEditOpen.value = true;
 };
 
 const closeEditProfile = () => {
     isEditOpen.value = false;
+    nicknameInvalid.value = false;
 };
 
 const saveProfile = async () => {
     if (!auth.value.token) return;
+    const nickname = sanitizeText(editForm.value.nickname).trim();
+    if (!nickname) {
+        statusText.value = '昵称为必填项';
+        nicknameInvalid.value = true;
+        return;
+    }
+    nicknameInvalid.value = false;
     const payload = {
-        nickname: editForm.value.nickname || '',
-        signature: editForm.value.signature || '',
+        nickname,
+        signature: sanitizeText(editForm.value.signature).trim(),
         gender: editForm.value.gender || '',
         birthday: editForm.value.birthday || '',
         country: editForm.value.country || '',
@@ -767,6 +791,15 @@ const signature = computed(() => {
 const nicknameCount = computed(() => editForm.value.nickname.length);
 const signatureCount = computed(() => editForm.value.signature.length);
 
+watch(
+    () => editForm.value.nickname,
+    (value) => {
+        if (nicknameInvalid.value && value?.trim()) {
+            nicknameInvalid.value = false;
+        }
+    }
+);
+
 const filteredFriends = computed(() => {
     const query = searchText.value.trim().toLowerCase();
     if (!query) return friends.value;
@@ -798,7 +831,7 @@ const formatTime = (value) => {
 
 const renderMessage = (msg) => {
     if (msg.type === 'text') {
-        return msg.data?.content || '';
+        return sanitizeText(msg.data?.content || '');
     }
     if (msg.type === 'image') return '[图片消息]';
     if (msg.type === 'video') return '[视频消息]';
@@ -1057,7 +1090,7 @@ const selectFriend = (friend) => {
 
 const sendMessage = async () => {
     if (!canSend.value) return;
-    const content = draft.value.trim();
+    const content = sanitizeText(draft.value).trim();
     if (!content) return;
     showSendMenu.value = false;
     const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1122,6 +1155,12 @@ const scrollToBottom = () => {
     const el = chatBodyRef.value;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
+};
+
+const sanitizeText = (value) => {
+    return String(value ?? '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/[<>]/g, '');
 };
 
 onMounted(async () => {
@@ -1478,6 +1517,7 @@ onBeforeUnmount(() => {
 .profile-field {
     display: grid;
     gap: 6px;
+    padding-left: 6px;
 }
 
 .profile-field__label {
@@ -1517,6 +1557,15 @@ onBeforeUnmount(() => {
     font-family: inherit;
 }
 
+.profile-field.is-invalid .profile-field__label {
+    color: #dc2626;
+}
+
+.profile-field.is-invalid input {
+    border-color: rgba(220, 38, 38, 0.65);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
 .profile-modal input:focus,
 .profile-modal select:focus {
     outline: none;
@@ -1524,19 +1573,13 @@ onBeforeUnmount(() => {
     box-shadow: 0 0 0 3px rgba(72, 147, 214, 0.15);
 }
 
-.profile-field__date {
-    appearance: none;
-    border: 1px solid rgba(31, 65, 120, 0.18);
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #1c2436;
-    background: #fff;
+.profile-modal .select-menu {
+    box-shadow: none;
+    scrollbar-width: none;
 }
 
-.profile-field__date::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.7;
+.profile-modal .select-menu::-webkit-scrollbar {
+    display: none;
 }
 
 .profile-field--split {
