@@ -11,12 +11,13 @@
     "friends": [
       100000001,
       100000002,
-      100000003
+      100000003,
+      100000004
     ],
     "signature": "原神牛逼",
-    "token": "70024dddd644be68b00dbfd63577709c2dc621d33291dd46a7bdb3d8fb33c735",
-    "tokenExpiresAt": "2026-07-16T09:49:02.696Z",
-    "lastLoginAt": "2026-01-16T09:49:02.696Z",
+    "token": "2a16ba5d401410c19f1149dc16c7ad28f50da5a45d0d572daf0d4e7d8a28ef7f",
+    "tokenExpiresAt": "2026-07-16T10:00:07.040Z",
+    "lastLoginAt": "2026-01-16T10:00:07.040Z",
     "online": true,
     "nickname": "rw0ter",
     "gender": "",
@@ -108,8 +109,36 @@
       "incoming": [],
       "outgoing": []
     },
-    "token": "59cde1aac4c4a9e75856461cc055cd1c97b9e45e99338b67eb83196a8c2e2e6e",
-    "tokenExpiresAt": "2026-07-16T09:51:32.737Z",
-    "lastLoginAt": "2026-01-16T09:51:32.737Z"
+    "token": "d441d2502ec83beafea6a0afda8ee60517dee7e39528518e4639634c4b90d40c",
+    "tokenExpiresAt": "2026-07-16T10:02:57.756Z",
+    "lastLoginAt": "2026-01-16T10:02:57.756Z"
+  },
+  {
+    "uid": 100000004,
+    "username": "demo2",
+    "passwordHash": "3b8a7adbd288b692db7e65962755a833cf5554686918acd59bb9b4b3a1f7f0c8cebefb39b9cbf780031520b9413b5ba876020be7cdd026d9cab7faa71073146a",
+    "salt": "a4e164990289cdad7937c527e650c1bd",
+    "iterations": 120000,
+    "keylen": 64,
+    "digest": "sha512",
+    "createdAt": "2026-01-16T10:00:28.909Z",
+    "friends": [
+      100000000
+    ],
+    "signature": "这个人很神秘，暂未填写签名",
+    "nickname": "demo2",
+    "gender": "",
+    "birthday": "",
+    "country": "",
+    "province": "",
+    "region": "",
+    "online": false,
+    "friendRequests": {
+      "incoming": [],
+      "outgoing": []
+    },
+    "token": "77cb230618728fbee49b5d012dffcab7fc1a4ea4abdce794dc3b436056c6d4fd",
+    "tokenExpiresAt": "2026-07-16T10:00:29.673Z",
+    "lastLoginAt": "2026-01-16T10:00:29.673Z"
   }
 ]

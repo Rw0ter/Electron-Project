@@ -477,7 +477,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, nextTick } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, nextTick, watch } from 'vue';
 import { API_BASE } from './utils/api.js';
 const NOTIFY_SOUND_URL = `${API_BASE}/resource/messagenotify.wav`;
 
@@ -678,6 +678,7 @@ const handleWsMessage = (payload) => {
     }
     if (message.type === 'requests') {
         loadRequests({ silent: true });
+        loadFriends({ silent: true });
         return;
     }
     if (message.type !== 'chat' || !message.data) {
@@ -714,6 +715,8 @@ const connectWebSocket = () => {
     wsRef.value = ws;
     ws.onopen = () => {
         wsReconnectAttempts = 0;
+        loadFriends({ silent: true });
+        loadRequests({ silent: true });
     };
     ws.onmessage = (event) => handleWsMessage(event.data);
     ws.onerror = () => {
@@ -1121,6 +1124,17 @@ onMounted(async () => {
     connectWebSocket();
     window.addEventListener('click', handleDocumentClick);
 });
+
+watch(
+    () => auth.value.token,
+    (nextToken, prevToken) => {
+        if (nextToken && nextToken !== prevToken) {
+            loadFriends({ silent: true });
+            loadRequests({ silent: true });
+            connectWebSocket();
+        }
+    }
+);
 
 onBeforeUnmount(() => {
     window.removeEventListener('click', handleDocumentClick);
