@@ -293,9 +293,46 @@
 
                     <div class="composer">
                         <div class="composer-toolbar">
-                            <button class="tool-icon-btn" title="表情">
+                            <button
+                                ref="emojiButtonRef"
+                                class="tool-icon-btn"
+                                :class="{ 'is-active': showEmojiPicker }"
+                                title="表情"
+                                @click.stop="toggleEmojiPicker"
+                            >
                                 <span class="tool-glyph">&#xE170;</span>
                             </button>
+                            <div
+                                v-if="showEmojiPicker"
+                                ref="emojiPickerRef"
+                                class="emoji-panel"
+                                @click.stop
+                            >
+                                <div class="emoji-tabs">
+                                    <button
+                                        v-for="tab in emojiTabs"
+                                        :key="tab.id"
+                                        class="emoji-tab"
+                                        :class="{ active: emojiTab === tab.id }"
+                                        type="button"
+                                        @click="emojiTab = tab.id"
+                                    >
+                                        {{ tab.label }}
+                                    </button>
+                                </div>
+                                <div v-if="currentEmojiList.length" class="emoji-grid">
+                                    <button
+                                        v-for="item in currentEmojiList"
+                                        :key="`${emojiTab}-${item}`"
+                                        class="emoji-btn"
+                                        type="button"
+                                        @click="addEmoji(item)"
+                                    >
+                                        {{ item }}
+                                    </button>
+                                </div>
+                                <div v-else class="emoji-empty">暂无表情</div>
+                            </div>
                             <button class="tool-icon-btn" title="剪刀">
                                 <span class="tool-glyph">&#xE8C6;</span>
                             </button>
@@ -318,6 +355,7 @@
                         </div>
                         <textarea
                             v-model="draft"
+                            ref="composerTextareaRef"
                             placeholder=""
                             @keydown.enter.exact.prevent="sendMessage"
                             @keydown.enter.shift.stop
@@ -539,10 +577,16 @@ const contactsNoticeType = ref('friend');
 const incomingRequests = ref([]);
 const outgoingRequests = ref([]);
 const showSendMenu = ref(false);
+const showEmojiPicker = ref(false);
+const emojiTab = ref('recent');
+const recentEmojis = ref([]);
 const isFriendProfileVisible = ref(false);
 const friendProfileRef = ref(null);
 const friendProfile = ref(null);
 const friendProfileLoading = ref(false);
+const emojiPickerRef = ref(null);
+const emojiButtonRef = ref(null);
+const composerTextareaRef = ref(null);
 let wsReconnectTimer = null;
 let wsReconnectAttempts = 0;
 let wsHeartbeatTimer = null;
@@ -846,9 +890,214 @@ const toggleSendMenu = () => {
     showSendMenu.value = !showSendMenu.value;
 };
 
+const emojiTabs = [
+    { id: 'recent', label: '最近' },
+    { id: 'smileys', label: '表情' },
+    { id: 'gestures', label: '手势' },
+    { id: 'nature', label: '自然' },
+    { id: 'food', label: '美食' },
+    { id: 'objects', label: '物品' }
+];
+
+const emojiCatalog = {
+    smileys: [
+        '😀',
+        '😁',
+        '😂',
+        '🤣',
+        '😅',
+        '😊',
+        '😍',
+        '😘',
+        '😜',
+        '🤪',
+        '🤩',
+        '😎',
+        '🥳',
+        '😇',
+        '🙂',
+        '🙃',
+        '😌',
+        '😴',
+        '🤔',
+        '😮',
+        '😱',
+        '😤',
+        '😭',
+        '😡',
+        '🤯',
+        '😬',
+        '😷',
+        '🤒',
+        '🤕',
+        '🤢',
+        '😈',
+        '👿'
+    ],
+    gestures: [
+        '👍',
+        '👎',
+        '👌',
+        '✌️',
+        '🤞',
+        '🤟',
+        '🤘',
+        '🤙',
+        '👋',
+        '🤚',
+        '🖐️',
+        '👏',
+        '🙏',
+        '💪',
+        '🫶',
+        '👐',
+        '🤝',
+        '☝️',
+        '👇',
+        '👉',
+        '👈',
+        '🙌'
+    ],
+    nature: [
+        '🐶',
+        '🐱',
+        '🐻',
+        '🐼',
+        '🦊',
+        '🐯',
+        '🦁',
+        '🐮',
+        '🐷',
+        '🐵',
+        '🐸',
+        '🐔',
+        '🐧',
+        '🐦',
+        '🦄',
+        '🐝',
+        '🐢',
+        '🐬',
+        '🐳',
+        '🌸',
+        '🌻',
+        '🌙',
+        '⭐',
+        '⚡',
+        '🔥',
+        '🌈'
+    ],
+    food: [
+        '🍎',
+        '🍉',
+        '🍊',
+        '🍓',
+        '🍒',
+        '🍑',
+        '🥭',
+        '🍍',
+        '🥑',
+        '🍅',
+        '🥕',
+        '🌽',
+        '🍞',
+        '🥐',
+        '🧀',
+        '🍔',
+        '🍟',
+        '🍕',
+        '🍜',
+        '🍣',
+        '🍰',
+        '🍫',
+        '🍿',
+        '🍩'
+    ],
+    objects: [
+        '🎉',
+        '🎁',
+        '🎈',
+        '🎀',
+        '📌',
+        '📎',
+        '✏️',
+        '🖊️',
+        '📷',
+        '🎧',
+        '🎮',
+        '💻',
+        '📱',
+        '📚',
+        '🧸',
+        '🕯️',
+        '🧩',
+        '🪄',
+        '🗂️',
+        '🛎️',
+        '🔔',
+        '💡',
+        '🧷',
+        '🧻'
+    ]
+};
+
+const currentEmojiList = computed(() => {
+    if (emojiTab.value === 'recent') {
+        if (recentEmojis.value.length) {
+            return recentEmojis.value;
+        }
+        return emojiCatalog.smileys.slice(0, 24);
+    }
+    return emojiCatalog[emojiTab.value] || [];
+});
+
+const toggleEmojiPicker = () => {
+    showEmojiPicker.value = !showEmojiPicker.value;
+};
+
+const closeEmojiPicker = () => {
+    showEmojiPicker.value = false;
+};
+
+const insertAtCursor = (emoji) => {
+    const el = composerTextareaRef.value;
+    if (!el) {
+        draft.value += emoji;
+        return;
+    }
+    const start = Number.isInteger(el.selectionStart)
+        ? el.selectionStart
+        : draft.value.length;
+    const end = Number.isInteger(el.selectionEnd) ? el.selectionEnd : start;
+    const current = draft.value;
+    draft.value = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
+    nextTick(() => {
+        el.focus();
+        const nextPos = start + emoji.length;
+        el.setSelectionRange(nextPos, nextPos);
+    });
+};
+
+const addEmoji = (emoji) => {
+    insertAtCursor(emoji);
+    const next = [emoji, ...recentEmojis.value.filter((item) => item !== emoji)];
+    recentEmojis.value = next.slice(0, 32);
+};
+
 const handleDocumentClick = (event) => {
     if (showSendMenu.value) {
         showSendMenu.value = false;
+    }
+    if (showEmojiPicker.value) {
+        const picker = emojiPickerRef.value;
+        const trigger = emojiButtonRef.value;
+        if (
+            picker &&
+            trigger &&
+            !picker.contains(event.target) &&
+            !trigger.contains(event.target)
+        ) {
+            closeEmojiPicker();
+        }
     }
     if (
         isFriendProfileVisible.value &&
@@ -2519,6 +2768,7 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 10px;
     padding: 6px 4px 2px;
+    position: relative;
 }
 
 .tool-icon-btn {
@@ -2540,9 +2790,85 @@ onBeforeUnmount(() => {
     color: #1f2937;
 }
 
+.tool-icon-btn.is-active {
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: #1d4ed8;
+}
+
 .tool-glyph {
     font-family: "Segoe MDL2 Assets";
     font-size: 16px;
+}
+
+.emoji-panel {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 10px);
+    width: 360px;
+    background: linear-gradient(180deg, #f9fcff 0%, #ffffff 100%);
+    border-radius: 18px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+    padding: 12px;
+    z-index: 6;
+}
+
+.emoji-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.emoji-tab {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #334155;
+    font-weight: 600;
+}
+
+.emoji-tab.active {
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.28);
+    color: #1d4ed8;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.emoji-btn {
+    width: 36px;
+    height: 34px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    transition: background 0.2s;
+}
+
+.emoji-btn:hover {
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.emoji-empty {
+    font-size: 12px;
+    color: rgba(15, 23, 42, 0.5);
+    padding: 16px 0;
+    text-align: center;
 }
 
 .tool-spacer {
