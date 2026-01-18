@@ -11,63 +11,67 @@
             <div class="topbar-center">
                 <div class="status-pill">{{ statusText }}</div>
             </div>
+            
             <div class="topbar-right">
-                <div class="user-card-wrap">
-                    <div
-                        class="user-card"
-                        @mouseenter="showProfile"
-                        @mouseleave="scheduleHideProfile"
-                    >
+                <div class="topbar-right-controls">
+                    <div class="topbar-right-spacer"></div>
+                    <div class="user-card-wrap">
                         <div
-                            class="user-avatar user-avatar-trigger"
+                            class="user-card"
                             @mouseenter="showProfile"
+                            @mouseleave="scheduleHideProfile"
                         >
-                            {{ initials }}
+                            <div
+                                class="user-avatar user-avatar-trigger"
+                                @mouseenter="showProfile"
+                            >
+                                {{ initials }}
+                            </div>
+                            <div class="user-meta">
+                                <div class="user-name">{{ displayName }}</div>
+                                <div class="user-id">UID {{ auth.uid || '---' }}</div>
+                            </div>
                         </div>
-                        <div class="user-meta">
-                            <div class="user-name">{{ displayName }}</div>
-                            <div class="user-id">UID {{ auth.uid || '---' }}</div>
-                        </div>
-                    </div>
-                    <div
-                        class="profile-popover"
-                        :class="{ 'is-visible': isProfileVisible }"
-                        @mouseenter="showProfile"
-                        @mouseleave="hideProfile"
-                    >
-                        <div class="profile-head">
-                            <div class="profile-avatar">{{ initials }}</div>
-                            <div class="profile-meta">
-                                <div class="profile-name">{{ displayName }}</div>
-                                <div class="profile-uid">UID {{ auth.uid || '---' }}</div>
-                                <div class="profile-signature">{{ signature }}</div>
-                                <div class="profile-details">
-                                    <div class="profile-detail">性别：{{ auth.gender || '未设置' }}</div>
-                                    <div class="profile-detail">生日：{{ auth.birthday || '未设置' }}</div>
-                                    <div class="profile-detail">
-                                        城市：{{ auth.country || '未设置' }}{{ auth.province ? ` / ${auth.province}` : '' }}{{ auth.region ? ` / ${auth.region}` : '' }}
+                        <div
+                            class="profile-popover"
+                            :class="{ 'is-visible': isProfileVisible }"
+                            @mouseenter="showProfile"
+                            @mouseleave="hideProfile"
+                        >
+                            <div class="profile-head">
+                                <div class="profile-avatar">{{ initials }}</div>
+                                <div class="profile-meta">
+                                    <div class="profile-name">{{ displayName }}</div>
+                                    <div class="profile-uid">UID {{ auth.uid || '---' }}</div>
+                                    <div class="profile-signature">{{ signature }}</div>
+                                    <div class="profile-details">
+                                        <div class="profile-detail">性别：{{ auth.gender || '未设置' }}</div>
+                                        <div class="profile-detail">生日：{{ auth.birthday || '未设置' }}</div>
+                                        <div class="profile-detail">
+                                            城市：{{ auth.country || '未设置' }}{{ auth.province ? ` / ${auth.province}` : '' }}{{ auth.region ? ` / ${auth.region}` : '' }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="profile-actions">
-                            <button class="profile-btn" type="button" @click="openEditProfile">编辑资料</button>
-                            <button class="profile-btn ghost" type="button" @click="handleLogout">
-                                退出登录
-                            </button>
+                            <div class="profile-actions">
+                                <button class="profile-btn" type="button" @click="openEditProfile">编辑资料</button>
+                                <button class="profile-btn ghost" type="button" @click="handleLogout">
+                                    退出登录
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="window-controls">
-                    <button class="wc-btn" @click="handleMin" title="最小化">
-                        <span class="wc-icon">&#xE921;</span>
-                    </button>
-                    <button class="wc-btn" @click="handleMax" title="最大化">
-                        <span class="wc-icon">&#xE922;</span>
-                    </button>
-                    <button class="wc-btn close" @click="handleClose" title="关闭">
-                        <span class="wc-icon">&#xE8BB;</span>
-                    </button>
+                    <div class="window-controls">
+                        <button class="wc-btn" @click="handleMin" title="最小化">
+                            <span class="wc-icon">&#xE921;</span>
+                        </button>
+                        <button class="wc-btn" @click="handleMax" title="最大化">
+                            <span class="wc-icon">&#xE922;</span>
+                        </button>
+                        <button class="wc-btn close" @click="handleClose" title="关闭">
+                            <span class="wc-icon">&#xE8BB;</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -1612,13 +1616,11 @@ onBeforeUnmount(() => {
     position: relative;
     overflow: hidden;
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
-    transition: opacity 280ms ease, transform 320ms ease;
+    transition: opacity 280ms ease;
 }
 
 .app-shell.app-enter {
     opacity: 1;
-    transform: translateY(0) scale(1);
 }
 
 .app-shell::before,
@@ -1655,6 +1657,7 @@ onBeforeUnmount(() => {
     position: relative;
     z-index: 2;
     -webkit-app-region: drag;
+    user-select: none;
 }
 
 .brand {
@@ -1689,7 +1692,10 @@ onBeforeUnmount(() => {
 .topbar-center {
     display: flex;
     justify-content: center;
+    user-select: none;
+    -webkit-app-region: drag;
 }
+
 
 .status-pill {
     padding: 4px 12px;
@@ -1706,7 +1712,22 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    user-select: none;
+    -webkit-app-region: drag;
+}
+
+.topbar-right-controls {
+    display: flex;
+    align-items: center;
     gap: 16px;
+    width: 100%;
+    -webkit-app-region: drag;
+}
+
+.topbar-right-spacer {
+    flex: 1;
+    height: 100%;
+    -webkit-app-region: drag;
 }
 
 .user-card-wrap {
@@ -1745,7 +1766,7 @@ onBeforeUnmount(() => {
 
 .profile-popover {
     position: absolute;
-    top: 10px;
+    top: calc(100% + 8px);
     right: 0;
     width: 320px;
     height: auto;
@@ -2643,6 +2664,8 @@ onBeforeUnmount(() => {
     display: flex;
     gap: 8px;
     user-select: none;
+    -webkit-app-region: drag;
+    
 }
 
 .chip {
