@@ -1699,6 +1699,7 @@ onBeforeUnmount(() => {
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.02em;
+    user-select: none;
 }
 
 .topbar-right {
@@ -1711,6 +1712,7 @@ onBeforeUnmount(() => {
 .user-card-wrap {
     position: relative;
     -webkit-app-region: no-drag;
+    user-select: none;
 }
 
 .user-card {
@@ -2049,6 +2051,7 @@ onBeforeUnmount(() => {
 .window-controls {
     display: flex;
     -webkit-app-region: no-drag;
+    user-select: none;
 }
 
 .wc-btn {
@@ -2093,6 +2096,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     justify-content: space-between;
     -webkit-app-region: no-drag;
+    user-select: none;
 }
 
 .rail-section {
@@ -2343,6 +2347,7 @@ onBeforeUnmount(() => {
     font-size: 11px;
     color: var(--ink-soft);
     text-align: right;
+    user-select: none;
 }
 
 .list {
@@ -2350,6 +2355,7 @@ onBeforeUnmount(() => {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    user-select: none;
 }
 
 .section-title {
@@ -2617,6 +2623,7 @@ onBeforeUnmount(() => {
 .chat-title {
     font-size: 18px;
     font-weight: 700;
+    user-select: none;
 }
 
 .chat-title.clickable {
@@ -2635,6 +2642,7 @@ onBeforeUnmount(() => {
 .chat-actions {
     display: flex;
     gap: 8px;
+    user-select: none;
 }
 
 .chip {
@@ -2745,6 +2753,7 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    user-select: none;
 }
 
 
@@ -2769,6 +2778,7 @@ onBeforeUnmount(() => {
     gap: 10px;
     padding: 6px 4px 2px;
     position: relative;
+    user-select: none;
 }
 
 .tool-icon-btn {
@@ -2918,6 +2928,7 @@ onBeforeUnmount(() => {
     overflow: visible;
     box-shadow: 0 10px 18px rgba(72, 147, 214, 0.25);
     position: relative;
+    user-select: none;
 }
 
 .send-btn {
@@ -3010,5 +3021,6 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: center;
+    user-select: none;
 }
 </style>
