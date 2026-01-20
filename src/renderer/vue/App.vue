@@ -2109,6 +2109,10 @@ onBeforeUnmount(() => {
     color: rgba(28, 36, 54, 0.65);
 }
 
+input:focus::placeholder{
+    color: transparent;
+}
+
 .profile-detail {
     line-height: 1.4;
 }
@@ -2274,6 +2278,8 @@ onBeforeUnmount(() => {
     width: 100%;
 }
 
+
+
 .profile-modal input {
     border-radius: 12px;
     border: 1px solid rgba(15, 23, 42, 0.12);
@@ -2298,6 +2304,13 @@ onBeforeUnmount(() => {
     outline: none;
     border-color: rgba(72, 147, 214, 0.5);
     box-shadow: 0 0 0 3px rgba(72, 147, 214, 0.15);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    box-shadow: none;
 }
 
 .profile-modal .select-menu {
@@ -2463,8 +2476,8 @@ onBeforeUnmount(() => {
     height: calc(100vh - var(--titlebar-h));
     display: grid;
     grid-template-columns: 70px 300px 1fr;
-    gap: 9px;
-    padding: 16px 5px 20px;
+    gap: 0px;
+   padding: 17px 2px 0px;
     position: relative;
     z-index: 1;
 }
@@ -2548,7 +2561,6 @@ onBeforeUnmount(() => {
 
 .sidebar {
     background: var(--panel-soft);
-    border-radius: var(--radius-lg);
     border: 1px solid var(--line);
     padding: 16px;
     display: flex;
@@ -2824,7 +2836,6 @@ onBeforeUnmount(() => {
 
 .chat {
     background: var(--panel);
-    border-radius: var(--radius-lg);
     border: 1px solid var(--line);
     display: flex;
     flex-direction: column;

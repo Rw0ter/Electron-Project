@@ -61,6 +61,6 @@ input[type="number"]:focus,
 select:focus,
 textarea:focus {
     outline: none;
-    border-color: rgba(224, 108, 64, 0.6);
-    box-shadow: 0 0 0 3px rgba(224, 108, 64, 0.15);
+    border-color: var(--line);
+    box-shadow: none;
 }
