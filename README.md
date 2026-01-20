@@ -1,4 +1,4 @@
-# electron-project
+# XinChat - 信聊
 
 This is an Electron + Vue project scaffolded locally.
 
