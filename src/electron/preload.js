@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAuthToken: () => ipcRenderer.invoke('get-auth-token'),
     logout: () => ipcRenderer.send('logout'),
     openFoundFriend: () => ipcRenderer.send('open-found-friend'),
+    openImagePreview: (url) => ipcRenderer.send('open-image-preview', url),
+    onImagePreview: (handler) => ipcRenderer.on('image-preview', (_, url) => handler(url)),
     windowClose: () => ipcRenderer.send('window-close'),
     windowMin: () => ipcRenderer.send('window-min'),
     windowMax: () => ipcRenderer.send('window-max'),

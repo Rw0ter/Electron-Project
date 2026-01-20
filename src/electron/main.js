@@ -24,6 +24,7 @@ let authRegion = null;
 let loginWin = null;
 let mainWin = null;
 let foundFriendWin = null;
+const imagePreviewWins = new Set();
 const flashTimers = new WeakMap();
 const isDev = process.env.VITE_DEV_SERVER_URL ? true : false;
 
@@ -279,6 +280,35 @@ ipcMain.on('logout', () => {
 
 ipcMain.on('open-found-friend', () => {
     createFoundFriendWindow();
+});
+
+ipcMain.on('open-image-preview', (_, url) => {
+    if (typeof url !== 'string' || !url.trim()) return;
+    const targetUrl = url.trim();
+    const isDataImage = targetUrl.startsWith('data:image/');
+    if (!isDataImage) {
+        return;
+    }
+    const previewWin = new BrowserWindow({
+        width: 900,
+        height: 700,
+        resizable: true,
+        backgroundColor: '#111111',
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+    previewWin.setMenu(null);
+    loadRendererPageFor(previewWin, 'image_preview.html');
+    previewWin.webContents.once('did-finish-load', () => {
+        previewWin.webContents.send('image-preview', targetUrl);
+    });
+    imagePreviewWins.add(previewWin);
+    previewWin.on('closed', () => {
+        imagePreviewWins.delete(previewWin);
+    });
 });
 
 const getSenderWindow = (event) => {

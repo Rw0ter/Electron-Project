@@ -289,13 +289,31 @@
                                 v-for="msg in displayMessages"
                                 :key="msg.id"
                                 class="bubble"
-                                :class="{ self: msg.senderUid === auth.uid, error: msg.error }"
+                                :class="{
+                                    self: msg.senderUid === auth.uid,
+                                    error: msg.error,
+                                    'image-only': isImageOnlyMessage(msg)
+                                }"
                             >
                                 <span v-if="msg.error" class="bubble-error-dot"></span>
                                 <div class="bubble-name">
                                     {{ msg.senderUid === auth.uid ? displayName : activeFriend?.username }}
                                 </div>
-                                <div class="bubble-text">{{ renderMessage(msg) }}</div>
+                                <div class="bubble-text">
+                                    <img
+                                        v-if="msg.type === 'image' && getMessageImageUrl(msg)"
+                                        class="bubble-image"
+                                        :src="getMessageImageUrl(msg)"
+                                        alt="image"
+                                        @dblclick.stop="openImagePreview(getMessageImageUrl(msg))"
+                                    />
+                                    <template v-if="msg.type === 'image'">
+                                        <div v-if="getMessageImageCaption(msg)" class="bubble-caption">
+                                            {{ getMessageImageCaption(msg) }}
+                                        </div>
+                                    </template>
+                                    <span v-else>{{ renderMessage(msg) }}</span>
+                                </div>
                                 <div class="bubble-time">{{ formatTime(msg.createdAt) }}</div>
                             </div>
                         </div>
@@ -353,7 +371,14 @@
                             <button class="tool-icon-btn" title="文件">
                                 <span class="tool-glyph">&#xE8A5;</span>
                             </button>
-                            <button class="tool-icon-btn" title="图片">
+                            <input
+                                ref="imageInputRef"
+                                class="composer-image-input"
+                                type="file"
+                                accept="image/*"
+                                @change="handleImageSelect"
+                            />
+                            <button class="tool-icon-btn" title="图片" @click="triggerImageSelect">
                                 <span class="tool-glyph">&#xEB9F;</span>
                             </button>
                             <button class="tool-icon-btn" title="红包">
@@ -367,12 +392,17 @@
                                 <span class="tool-glyph">&#xE712;</span>
                             </button>
                         </div>
+                        <div v-if="draftImage" class="composer-image-preview">
+                            <img :src="draftImage" alt="preview" />
+                            <button class="preview-remove" type="button" @click="clearDraftImage">×</button>
+                        </div>
                         <textarea
                             v-model="draft"
                             ref="composerTextareaRef"
                             placeholder=""
                             @keydown.enter.exact.prevent="sendMessage"
                             @keydown.enter.shift.stop
+                            @paste="handleComposerPaste"
                         ></textarea>
                         <div class="composer-actions">
                             <div class="send-group">
@@ -668,6 +698,8 @@ const emojiPickerRef = ref(null);
 const emojiButtonRef = ref(null);
 const composerTextareaRef = ref(null);
 const avatarInputRef = ref(null);
+const imageInputRef = ref(null);
+const draftImage = ref('');
 const isCropOpen = ref(false);
 const cropSource = ref('');
 const cropScale = ref(1);
@@ -731,6 +763,7 @@ const handleLogout = () => {
 
 const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
 const CROP_SIZE = 240;
+const MAX_CHAT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 const readFileAsDataUrl = (file) =>
     new Promise((resolve, reject) => {
@@ -750,6 +783,17 @@ const loadImage = (src) =>
 
 const triggerAvatarSelect = () => {
     avatarInputRef.value?.click?.();
+};
+
+const triggerImageSelect = () => {
+    imageInputRef.value?.click?.();
+};
+
+const clearDraftImage = () => {
+    draftImage.value = '';
+    if (imageInputRef.value) {
+        imageInputRef.value.value = '';
+    }
 };
 
 const clearAvatar = () => {
@@ -784,6 +828,53 @@ const handleAvatarChange = async (event) => {
         }
     } catch {
         statusText.value = '头像读取失败';
+    }
+};
+
+const setDraftImage = async (file) => {
+    if (!file.type?.startsWith('image/')) {
+        statusText.value = '请上传图片格式文件';
+        return;
+    }
+    if (file.size > MAX_CHAT_IMAGE_BYTES) {
+        statusText.value = '图片大小需小于 20MB';
+        return;
+    }
+    const dataUrl = await readFileAsDataUrl(file);
+    if (typeof dataUrl === 'string') {
+        draftImage.value = dataUrl;
+    }
+};
+
+const handleImageSelect = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    try {
+        await setDraftImage(file);
+    } catch {
+        statusText.value = '图片读取失败';
+    } finally {
+        if (event.target) {
+            event.target.value = '';
+        }
+    }
+};
+
+const handleComposerPaste = async (event) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+        if (item.kind === 'file' && item.type?.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (!file) return;
+            event.preventDefault();
+            try {
+                await setDraftImage(file);
+            } catch {
+                statusText.value = '图片读取失败';
+            }
+            return;
+        }
     }
 };
 
@@ -1423,7 +1514,7 @@ const canSend = computed(() => {
     return (
         !!auth.value.token &&
         !!activeFriend.value?.uid &&
-        draft.value.trim().length > 0
+        (draft.value.trim().length > 0 || !!draftImage.value)
     );
 });
 
@@ -1447,6 +1538,28 @@ const renderMessage = (msg) => {
     if (msg.type === 'voice') return '[语音消息]';
     if (msg.type === 'gif') return '[GIF 表情]';
     return '[未知消息]';
+};
+
+const getMessageImageUrl = (msg) => {
+    if (msg?.type !== 'image') return '';
+    const url = msg.data?.url || msg.data?.content || '';
+    return typeof url === 'string' ? url : '';
+};
+
+const getMessageImageCaption = (msg) => {
+    if (msg?.type !== 'image') return '';
+    const caption = msg.data?.content || '';
+    return sanitizeText(caption).trim();
+};
+
+const isImageOnlyMessage = (msg) => {
+    if (msg?.type !== 'image') return false;
+    return !getMessageImageCaption(msg);
+};
+
+const openImagePreview = (url) => {
+    if (!url) return;
+    window.electronAPI?.openImagePreview?.(url);
 };
 
 const displayMessages = computed(() => {
@@ -1721,19 +1834,15 @@ const selectFriend = async (friend) => {
     scheduleScrollToBottom();
 };
 
-const sendMessage = async () => {
-    if (!canSend.value) return;
-    const content = sanitizeText(draft.value).trim();
-    if (!content) return;
-    showSendMenu.value = false;
+const sendChatEntry = async ({ type, data, payload }) => {
     const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const localEntry = {
         id: localId,
-        type: 'text',
+        type,
         senderUid: auth.value.uid,
         targetUid: activeFriend.value.uid,
         targetType: 'private',
-        data: { content },
+        data,
         createdAt: new Date().toISOString(),
         pending: true,
         error: false
@@ -1750,31 +1859,65 @@ const sendMessage = async () => {
                 senderUid: auth.value.uid,
                 targetUid: activeFriend.value.uid,
                 targetType: 'private',
-                type: 'text',
-                content
+                type,
+                ...payload
             })
         });
-        const data = await res.json();
-        if (res.ok && data?.success) {
-            if (data.data?.id && !messageIdSet.has(data.data.id)) {
-                messageIdSet.add(data.data.id);
-                messages.value = [...messages.value, data.data];
+        const result = await res.json();
+        if (res.ok && result?.success) {
+            if (result.data?.id && !messageIdSet.has(result.data.id)) {
+                messageIdSet.add(result.data.id);
+                messages.value = [...messages.value, result.data];
             }
-            draft.value = '';
             await nextTick();
             scrollToBottom();
             localMessages.value = localMessages.value.filter((item) => item.id !== localId);
-        } else {
-            localMessages.value = localMessages.value.map((item) =>
-                item.id === localId ? { ...item, pending: false, error: true } : item
-            );
-            statusText.value = data?.message || '发送失败';
+            return true;
         }
+        localMessages.value = localMessages.value.map((item) =>
+            item.id === localId ? { ...item, pending: false, error: true } : item
+        );
+        statusText.value = result?.message || '发送失败';
+        return false;
     } catch (err) {
         localMessages.value = localMessages.value.map((item) =>
             item.id === localId ? { ...item, pending: false, error: true } : item
         );
         statusText.value = '发送失败';
+        return false;
+    }
+};
+
+const sendMessage = async () => {
+    if (!canSend.value) return;
+    showSendMenu.value = false;
+    const content = sanitizeText(draft.value).trim();
+    const hasText = content.length > 0;
+    const hasImage = !!draftImage.value;
+    if (!hasText && !hasImage) return;
+    if (hasImage) {
+        const ok = await sendChatEntry({
+            type: 'image',
+            data: { url: draftImage.value, content: hasText ? content : '' },
+            payload: { url: draftImage.value, content: hasText ? content : '' }
+        });
+        if (ok) {
+            clearDraftImage();
+            if (hasText) {
+                draft.value = '';
+            }
+        }
+        return;
+    }
+    if (hasText) {
+        const ok = await sendChatEntry({
+            type: 'text',
+            data: { content },
+            payload: { content }
+        });
+        if (ok) {
+            draft.value = '';
+        }
     }
 };
 
@@ -3114,10 +3257,21 @@ select:focus {
     position: relative;
 }
 
+.bubble.image-only {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
 .bubble.self {
     align-self: flex-end;
     background: #2b6cb0;
     color: #fff;
+}
+
+.bubble.image-only.self {
+    background: transparent;
+    color: inherit;
 }
 
 .bubble.error {
@@ -3149,6 +3303,17 @@ select:focus {
     word-break: break-word;
 }
 
+.bubble-image {
+    max-width: 90%;
+    max-height: 240px;
+    border-radius: 12px;
+    display: block;
+}
+
+.bubble-caption {
+    margin-top: 8px;
+}
+
 .serach_input_box{
     display: flex;
     align-items: center;
@@ -3171,6 +3336,8 @@ select:focus {
     gap: 12px;
     flex: 0 0 auto;
     max-height: 210px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .composer-toolbar {
@@ -3305,6 +3472,42 @@ select:focus {
 
 .composer textarea:focus {
     box-shadow: unset;
+}
+
+.composer-image-input {
+    display: none;
+}
+
+.composer-image-preview {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin-bottom: 8px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #fff;
+}
+
+.composer-image-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.preview-remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(15, 23, 42, 0.7);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 
