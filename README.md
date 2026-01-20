@@ -1,37 +1,76 @@
-# XinChat - 信聊
+# XinChat
 
-This is an Electron + Vue project scaffolded locally.
+Electron + Vite + Vue desktop chat app with a local Node/Express backend.
 
 ## Overview
 
-- Electron application with Vue frontend
-- Node.js + Express backend (local auth service)
+- Desktop UI: Electron + Vue 3
+- Local backend: Express + WebSocket
+- Local storage: JSON for users, SQLite (sql.js) for chat history
 
-## Structure
+## Features
 
-- `src/electron/`: Electron 主进程与预加载脚本（生产/测试共用）
-- `src/renderer/`: Vite 渲染层根目录
-  - `index.html`: 主界面入口
-  - `login.html`: 登录注册入口
-  - `vue/`: Vue 应用源码
-- `configs/vite/`: Vite 配置（本地测试/上线分离）
-- `scripts/`: 本地开发启动脚本
+- Login and local user profiles
+- Friend list, friend requests, presence
+- 1:1 chat with WebSocket updates
+- Profile editor with avatar upload and crop
 
-## Development (本地测试)
+## Repository Structure
 
-- Install dependencies: `npm install`
-- Start dev (Vite + Electron): `npm run dev`
-  - Uses `configs/vite/vite.config.dev.js`
-- Start backend: `npm run backend` (default port: 3001)
+- `src/electron/`: Electron main process and preload
+- `src/renderer/`: Vite renderer entry points
+  - `index.html`: main app
+  - `login.html`: login/register page
+  - `vue/`: Vue app source
+- `backend/`: Express server (auth, friends, chat, ws)
+- `configs/vite/`: Vite configs for dev/prod
+- `scripts/`: local dev bootstrap
 
-## Production (上线版本)
+## Requirements
 
-- Build renderer + package: `npm run build`
-  - Uses `configs/vite/vite.config.prod.js`
-- Start packaged app (after build): `npm run start`
+- Node.js 18+ recommended
+
+## Development
+
+1. Install deps:
+   ```bash
+   npm install
+   ```
+2. Start backend (port 3001 by default):
+   ```bash
+   npm run backend
+   ```
+3. Start Electron + Vite dev:
+   ```bash
+   npm run dev
+   ```
+
+The dev script uses `configs/vite/vite.config.dev.js`.
+
+## Production
+
+Build renderer + package:
+```bash
+npm run build
+```
+
+Start packaged app:
+```bash
+npm run start
+```
+
+The build uses `configs/vite/vite.config.prod.js`.
+
+## Configuration
+
+- API base URL is set in `src/renderer/vue/utils/api.js`.
+- Backend default port is `3001` (see `backend/index.js`).
+
+## Backend Notes
+
+The backend is a local service intended to run on the same machine as the app.
+It exposes REST endpoints under `/api` and a WebSocket at `/ws`.
 
 ## License
 
-MIT — see `LICENSE` file.
-
-
+ISC (see `LICENSE`).

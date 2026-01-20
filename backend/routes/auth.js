@@ -19,8 +19,37 @@ const loginAttempts = new Map();
 const DEFAULT_SIGNATURE = '这个人很神秘，暂未填写签名';
 const MAX_NICKNAME_LEN = 36;
 const MAX_SIGNATURE_LEN = 80;
+const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
 
 const normalizeUsername = (value) => value.trim().toLowerCase();
+
+const estimateBase64Bytes = (value) => {
+  const commaIndex = value.indexOf(',');
+  if (commaIndex === -1) return 0;
+  const base64 = value.slice(commaIndex + 1).trim();
+  if (!base64) return 0;
+  let padding = 0;
+  if (base64.endsWith('==')) {
+    padding = 2;
+  } else if (base64.endsWith('=')) {
+    padding = 1;
+  }
+  return Math.floor(base64.length * 0.75) - padding;
+};
+
+const normalizeAvatar = (value) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(trimmed)) {
+    return null;
+  }
+  const size = estimateBase64Bytes(trimmed);
+  if (!size || size > MAX_AVATAR_BYTES) {
+    return null;
+  }
+  return trimmed;
+};
 
 const extractToken = (req) => {
   const header = req.headers.authorization || '';
@@ -134,6 +163,10 @@ const ensureUserDefaults = async (users) => {
     }
     if (typeof user.signature !== 'string') {
       user.signature = DEFAULT_SIGNATURE;
+      updated = true;
+    }
+    if (typeof user.avatar !== 'string') {
+      user.avatar = '';
       updated = true;
     }
     if (typeof user.online !== 'boolean') {
@@ -390,6 +423,7 @@ router.post('/register', async (req, res) => {
       createdAt: new Date().toISOString(),
       friends: [],
       signature: DEFAULT_SIGNATURE,
+      avatar: '',
       nickname: trimmedUsername,
       gender: '',
       birthday: '',
@@ -489,6 +523,7 @@ router.post('/login', async (req, res) => {
       tokenExpiresAt: expiresAt,
       uid: users[userIndex].uid,
       username: users[userIndex].username,
+      avatar: users[userIndex].avatar || '',
       nickname: users[userIndex].nickname || users[userIndex].username,
       signature: users[userIndex].signature || '',
       gender: users[userIndex].gender || '',
@@ -530,6 +565,7 @@ router.get('/profile', authenticate, async (req, res) => {
       country: user.country || '',
       province: user.province || '',
       region: user.region || '',
+      avatar: user.avatar || '',
     },
   });
 });
@@ -544,6 +580,14 @@ router.post('/profile', authenticate, async (req, res) => {
   const country = typeof payload.country === 'string' ? payload.country.trim() : '';
   const province = typeof payload.province === 'string' ? payload.province.trim() : '';
   const region = typeof payload.region === 'string' ? payload.region.trim() : '';
+  let avatar = null;
+  if (Object.prototype.hasOwnProperty.call(payload, 'avatar')) {
+    avatar = normalizeAvatar(payload.avatar);
+    if (avatar === null) {
+      res.status(400).json({ success: false, message: 'Invalid avatar.' });
+      return;
+    }
+  }
 
   if (nickname.length > MAX_NICKNAME_LEN) {
     res.status(400).json({ success: false, message: '昵称长度过长。' });
@@ -554,7 +598,7 @@ router.post('/profile', authenticate, async (req, res) => {
     return;
   }
 
-  users[userIndex] = {
+  const nextUser = {
     ...users[userIndex],
     nickname: nickname || users[userIndex].nickname || users[userIndex].username,
     signature: signature || DEFAULT_SIGNATURE,
@@ -564,6 +608,10 @@ router.post('/profile', authenticate, async (req, res) => {
     province,
     region,
   };
+  if (avatar !== null) {
+    nextUser.avatar = avatar;
+  }
+  users[userIndex] = nextUser;
   await writeUsers(users);
 
   res.json({
@@ -578,6 +626,7 @@ router.post('/profile', authenticate, async (req, res) => {
       country: users[userIndex].country || '',
       province: users[userIndex].province || '',
       region: users[userIndex].region || '',
+      avatar: users[userIndex].avatar || '',
     },
   });
 });

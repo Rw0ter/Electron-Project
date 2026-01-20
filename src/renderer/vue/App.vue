@@ -25,7 +25,8 @@
                                 class="user-avatar user-avatar-trigger"
                                 @mouseenter="showProfile"
                             >
-                                {{ initials }}
+                                <img v-if="auth.avatar" :src="auth.avatar" alt="avatar" />
+                                <span v-else>{{ initials }}</span>
                             </div>
                             <div class="user-meta">
                                 <div class="user-name">{{ displayName }}</div>
@@ -39,7 +40,10 @@
                             @mouseleave="hideProfile"
                         >
                             <div class="profile-head">
-                                <div class="profile-avatar">{{ initials }}</div>
+                                <div class="profile-avatar">
+                                    <img v-if="auth.avatar" :src="auth.avatar" alt="avatar" />
+                                    <span v-else>{{ initials }}</span>
+                                </div>
                                 <div class="profile-meta">
                                     <div class="profile-name">{{ displayName }}</div>
                                     <div class="profile-uid">UID {{ auth.uid || '---' }}</div>
@@ -140,7 +144,10 @@
                             :class="{ active: activeFriend?.uid === friend.uid }"
                             @click="selectFriend(friend)"
                         >
-                            <div class="avatar">{{ friend.username?.slice(0, 2).toUpperCase() }}</div>
+                            <div class="avatar">
+                                <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                <span v-else>{{ friend.username?.slice(0, 2).toUpperCase() }}</span>
+                            </div>
                             <div class="list-meta">
                                 <div class="list-name">{{ friend.username }}</div>
                                 <div class="list-sub">UID {{ friend.uid }}</div>
@@ -253,7 +260,10 @@
                                 @click.stop
                             >
                                 <div class="profile-head">
-                                    <div class="profile-avatar">{{ friendInitials }}</div>
+                                    <div class="profile-avatar">
+                                        <img v-if="friendProfileSource?.avatar" :src="friendProfileSource?.avatar" alt="avatar" />
+                                        <span v-else>{{ friendInitials }}</span>
+                                    </div>
                                     <div class="profile-meta">
                                         <div class="profile-name">{{ friendDisplayName }}</div>
                                         <div class="profile-uid">UID {{ friendProfileSource?.uid || '---' }}</div>
@@ -458,7 +468,30 @@
                         <button class="profile-modal__close" type="button" @click="closeEditProfile">×</button>
                     </div>
                     <div class="profile-modal__body">
-                        <div class="profile-modal__avatar">{{ initials }}</div>
+                        <div class="profile-modal__avatar">
+                            <img v-if="editForm.avatar" :src="editForm.avatar" alt="avatar" />
+                            <span v-else>{{ initials }}</span>
+                        </div>
+                        <div class="profile-modal__upload">
+                            <input
+                                ref="avatarInputRef"
+                                class="profile-modal__file"
+                                type="file"
+                                accept="image/*"
+                                @change="handleAvatarChange"
+                            />
+                            <button class="profile-btn ghost" type="button" @click="triggerAvatarSelect">
+                                上传头像
+                            </button>
+                            <button
+                                v-if="editForm.avatar"
+                                class="profile-btn ghost"
+                                type="button"
+                                @click="clearAvatar"
+                            >
+                                移除
+                            </button>
+                        </div>
 
                     <label class="profile-field" :class="{ 'is-invalid': nicknameInvalid }">
                         <span class="profile-field__label">昵称</span>
@@ -539,6 +572,48 @@
                 </div>
             </div>
         </transition>
+        <transition name="profile-modal" appear>
+            <div v-show="isCropOpen" class="crop-modal">
+                <div class="profile-modal__backdrop" @click="closeCropper"></div>
+                <div class="crop-modal__panel">
+                    <div class="profile-modal__header">
+                        <div class="profile-modal__title">裁切头像</div>
+                        <button class="profile-modal__close" type="button" @click="closeCropper">×</button>
+                    </div>
+                    <div class="crop-modal__body">
+                        <div
+                            class="crop-frame"
+                            @pointerdown.prevent="startCropDrag"
+                        >
+                            <img
+                                v-if="cropSource"
+                                class="crop-image"
+                                :src="cropSource"
+                                :style="cropImageStyle"
+                                alt="crop"
+                                draggable="false"
+                            />
+                        </div>
+                        <div class="crop-controls">
+                            <label class="crop-zoom">
+                                <span>缩放</span>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="3"
+                                    step="0.01"
+                                    v-model.number="cropScale"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                    <div class="profile-modal__footer">
+                        <button class="profile-btn" type="button" @click="applyCrop">确定</button>
+                        <button class="profile-btn ghost" type="button" @click="closeCropper">取消</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
     </div>
 </template>
 
@@ -556,6 +631,7 @@ const auth = ref({
     username: '',
     nickname: '',
     signature: '',
+    avatar: '',
     gender: '',
     birthday: '',
     country: '',
@@ -591,6 +667,16 @@ const friendProfileLoading = ref(false);
 const emojiPickerRef = ref(null);
 const emojiButtonRef = ref(null);
 const composerTextareaRef = ref(null);
+const avatarInputRef = ref(null);
+const isCropOpen = ref(false);
+const cropSource = ref('');
+const cropScale = ref(1);
+const cropOffset = ref({ x: 0, y: 0 });
+const cropImage = ref({ width: 0, height: 0 });
+const cropBaseScale = ref(1);
+const cropDragging = ref(false);
+const cropStart = ref({ x: 0, y: 0 });
+const cropStartOffset = ref({ x: 0, y: 0 });
 let wsReconnectTimer = null;
 let wsReconnectAttempts = 0;
 let wsHeartbeatTimer = null;
@@ -611,6 +697,7 @@ let profileHideTimer = null;
 const editForm = ref({
     nickname: '',
     signature: '',
+    avatar: '',
     gender: '',
     birthday: '',
     country: '',
@@ -642,10 +729,157 @@ const handleLogout = () => {
     window.electronAPI?.logout?.();
 };
 
+const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
+const CROP_SIZE = 240;
+
+const readFileAsDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Avatar read failed.'));
+        reader.readAsDataURL(file);
+    });
+
+const loadImage = (src) =>
+    new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Avatar load failed.'));
+        img.src = src;
+    });
+
+const triggerAvatarSelect = () => {
+    avatarInputRef.value?.click?.();
+};
+
+const clearAvatar = () => {
+    editForm.value.avatar = '';
+    if (avatarInputRef.value) {
+        avatarInputRef.value.value = '';
+    }
+};
+
+const handleAvatarChange = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+        statusText.value = '请上传图片格式文件';
+        event.target.value = '';
+        return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+        statusText.value = '头像大小需小于 20MB';
+        event.target.value = '';
+        return;
+    }
+    try {
+        const dataUrl = await readFileAsDataUrl(file);
+        if (typeof dataUrl === 'string') {
+            const img = await loadImage(dataUrl);
+            if (img.width === img.height) {
+                editForm.value.avatar = dataUrl;
+            } else {
+                openCropper(dataUrl, img.width, img.height);
+            }
+        }
+    } catch {
+        statusText.value = '头像读取失败';
+    }
+};
+
+const openCropper = (dataUrl, width, height) => {
+    cropSource.value = dataUrl;
+    cropImage.value = { width, height };
+    cropBaseScale.value = Math.max(CROP_SIZE / width, CROP_SIZE / height);
+    cropScale.value = 1;
+    cropOffset.value = { x: 0, y: 0 };
+    isCropOpen.value = true;
+};
+
+const closeCropper = () => {
+    isCropOpen.value = false;
+    cropSource.value = '';
+    if (cropDragging.value) {
+        stopCropDrag();
+    }
+};
+
+const clampCropOffset = (offset, scale) => {
+    const width = cropImage.value.width;
+    const height = cropImage.value.height;
+    const scaledW = width * scale;
+    const scaledH = height * scale;
+    const maxX = Math.max(0, (scaledW - CROP_SIZE) / 2);
+    const maxY = Math.max(0, (scaledH - CROP_SIZE) / 2);
+    return {
+        x: Math.min(maxX, Math.max(-maxX, offset.x)),
+        y: Math.min(maxY, Math.max(-maxY, offset.y))
+    };
+};
+
+const startCropDrag = (event) => {
+    if (!isCropOpen.value) return;
+    cropDragging.value = true;
+    cropStart.value = { x: event.clientX, y: event.clientY };
+    cropStartOffset.value = { ...cropOffset.value };
+    window.addEventListener('pointermove', handleCropDrag);
+    window.addEventListener('pointerup', stopCropDrag);
+};
+
+const handleCropDrag = (event) => {
+    if (!cropDragging.value) return;
+    const dx = event.clientX - cropStart.value.x;
+    const dy = event.clientY - cropStart.value.y;
+    const scale = cropBaseScale.value * cropScale.value;
+    cropOffset.value = clampCropOffset(
+        { x: cropStartOffset.value.x + dx, y: cropStartOffset.value.y + dy },
+        scale
+    );
+};
+
+const stopCropDrag = () => {
+    cropDragging.value = false;
+    window.removeEventListener('pointermove', handleCropDrag);
+    window.removeEventListener('pointerup', stopCropDrag);
+};
+
+const applyCrop = async () => {
+    try {
+        const img = await loadImage(cropSource.value);
+        const scale = cropBaseScale.value * cropScale.value;
+        const scaledW = img.width * scale;
+        const scaledH = img.height * scale;
+        const imgLeft = (CROP_SIZE - scaledW) / 2 + cropOffset.value.x;
+        const imgTop = (CROP_SIZE - scaledH) / 2 + cropOffset.value.y;
+        const sSize = CROP_SIZE / scale;
+        let sx = -imgLeft / scale;
+        let sy = -imgTop / scale;
+        sx = Math.min(Math.max(sx, 0), Math.max(0, img.width - sSize));
+        sy = Math.min(Math.max(sy, 0), Math.max(0, img.height - sSize));
+        const canvas = document.createElement('canvas');
+        canvas.width = CROP_SIZE;
+        canvas.height = CROP_SIZE;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            statusText.value = '裁切失败';
+            return;
+        }
+        ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, CROP_SIZE, CROP_SIZE);
+        editForm.value.avatar = canvas.toDataURL('image/png');
+        closeCropper();
+        if (avatarInputRef.value) {
+            avatarInputRef.value.value = '';
+        }
+    } catch {
+        statusText.value = '裁切失败';
+    }
+};
+
 const openEditProfile = () => {
     editForm.value = {
         nickname: auth.value.nickname || auth.value.username || '',
         signature: auth.value.signature || '',
+        avatar: auth.value.avatar || '',
         gender: auth.value.gender || '',
         birthday: auth.value.birthday || '',
         country: auth.value.country || '',
@@ -677,7 +911,8 @@ const saveProfile = async () => {
         birthday: editForm.value.birthday || '',
         country: editForm.value.country || '',
         province: editForm.value.province || '',
-        region: editForm.value.region || ''
+        region: editForm.value.region || '',
+        avatar: editForm.value.avatar || ''
     };
     try {
         const res = await fetch(`${API_BASE}/api/profile`, {
@@ -1147,12 +1382,30 @@ const friendProfileSource = computed(() => friendProfile.value || activeFriend.v
 const nicknameCount = computed(() => editForm.value.nickname.length);
 const signatureCount = computed(() => editForm.value.signature.length);
 
+const cropImageStyle = computed(() => {
+    if (!cropSource.value) return {};
+    const scale = cropBaseScale.value * cropScale.value;
+    return {
+        width: `${cropImage.value.width}px`,
+        height: `${cropImage.value.height}px`,
+        transform: `translate(-50%, -50%) translate(${cropOffset.value.x}px, ${cropOffset.value.y}px) scale(${scale})`
+    };
+});
+
 watch(
     () => editForm.value.nickname,
     (value) => {
         if (nicknameInvalid.value && value?.trim()) {
             nicknameInvalid.value = false;
         }
+    }
+);
+
+watch(
+    () => cropScale.value,
+    () => {
+        const scale = cropBaseScale.value * cropScale.value;
+        cropOffset.value = clampCropOffset(cropOffset.value, scale);
     }
 );
 
@@ -1281,6 +1534,7 @@ const loadProfile = async ({ silent } = {}) => {
                 username: data.user.username || auth.value.username,
                 nickname: data.user.nickname || auth.value.nickname,
                 signature: data.user.signature || auth.value.signature,
+                avatar: data.user.avatar || auth.value.avatar,
                 gender: data.user.gender || auth.value.gender,
                 birthday: data.user.birthday || auth.value.birthday,
                 country: data.user.country || auth.value.country,
@@ -1317,6 +1571,7 @@ const loadAuth = async () => {
             username: info.username || '',
             nickname: info.nickname || '',
             signature: info.signature || '',
+            avatar: info.avatar || '',
             gender: info.gender || '',
             birthday: info.birthday || '',
             country: info.country || '',
@@ -1333,6 +1588,7 @@ const loadAuth = async () => {
             username: fallback || '',
             nickname: fallbackNickname || '',
             signature: fallbackSignature || '',
+            avatar: '',
             gender: '',
             birthday: '',
             country: '',
@@ -1600,6 +1856,9 @@ watch(
 onBeforeUnmount(() => {
     window.removeEventListener('click', handleDocumentClick);
     closeWebSocket();
+    if (cropDragging.value) {
+        stopCropDrag();
+    }
     if (profileHideTimer) {
         clearTimeout(profileHideTimer);
         profileHideTimer = null;
@@ -1755,6 +2014,13 @@ onBeforeUnmount(() => {
     display: grid;
     place-items: center;
     -webkit-app-region: no-drag;
+    overflow: hidden;
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .user-meta {
@@ -1804,6 +2070,13 @@ onBeforeUnmount(() => {
     place-items: center;
     font-weight: 700;
     font-size: 16px;
+    overflow: hidden;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .profile-meta {
@@ -1948,6 +2221,24 @@ onBeforeUnmount(() => {
     font-weight: 700;
     font-size: 20px;
     margin: 0 auto 6px;
+    overflow: hidden;
+}
+
+.profile-modal__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-modal__upload {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.profile-modal__file {
+    display: none;
 }
 
 .profile-field {
@@ -2031,6 +2322,76 @@ onBeforeUnmount(() => {
     margin-top: 16px;
 }
 
+.crop-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: grid;
+    place-items: center;
+    opacity: 1;
+}
+
+.crop-modal__panel {
+    position: relative;
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 255, 0.98));
+    border-radius: 18px;
+    border: 1px solid rgba(72, 147, 214, 0.2);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    padding: 20px 22px 18px;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    -webkit-app-region: no-drag;
+}
+
+.crop-modal__body {
+    display: grid;
+    gap: 14px;
+    justify-items: center;
+    padding-bottom: 6px;
+}
+
+.crop-frame {
+    width: 240px;
+    height: 240px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.06);
+    position: relative;
+    cursor: grab;
+    user-select: none;
+}
+
+.crop-frame:active {
+    cursor: grabbing;
+}
+
+.crop-image {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center;
+}
+
+.crop-controls {
+    width: 100%;
+    display: grid;
+    gap: 6px;
+}
+
+.crop-zoom {
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.65);
+}
+
+.crop-zoom input[type="range"] {
+    width: 100%;
+}
+
 .profile-modal-enter-active,
 .profile-modal-leave-active {
     transition: opacity 160ms ease-out;
@@ -2102,8 +2463,8 @@ onBeforeUnmount(() => {
     height: calc(100vh - var(--titlebar-h));
     display: grid;
     grid-template-columns: 70px 300px 1fr;
-    gap: 18px;
-    padding: 16px 10px 20px;
+    gap: 9px;
+    padding: 16px 5px 20px;
     position: relative;
     z-index: 1;
 }
@@ -2422,6 +2783,13 @@ onBeforeUnmount(() => {
     display: grid;
     place-items: center;
     font-size: 13px;
+    overflow: hidden;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .list-meta {
