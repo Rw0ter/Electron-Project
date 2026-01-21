@@ -422,14 +422,17 @@
                                 </div>
                                 <div class="contact-profile-actions">
                                     <button class="contact-action-btn" type="button" title="分享">
-                                        <span class="tool-icon">&#xE72D;</span>
+                                        <span class="contact-action-icon">&#xE72D;</span>
+                                        <span class="contact-action-text">分享</span>
                                     </button>
                                     <button class="contact-action-btn" type="button" title="音视频通话">
-                                        <span class="tool-icon">&#xE717;</span>
+                                        <span class="contact-action-icon">&#xE717;</span>
+                                        <span class="contact-action-text">音视频通话</span>
                                     </button>
                                     <button class="contact-action-btn primary" type="button" title="发消息"
                                         @click="enterChatFromContact">
-                                        <span class="tool-icon">&#xE8BD;</span>
+                                        <span class="contact-action-icon">&#xE8BD;</span>
+                                        <span class="contact-action-text">发消息</span>
                                     </button>
                                 </div>
                             </div>
@@ -3665,35 +3668,49 @@ select:focus {
 .contact-profile-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     margin-top: 14px;
 }
 
 .contact-action-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    border: 1px solid rgba(15, 23, 42, 0.12);
-    background: rgba(15, 23, 42, 0.04);
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 16px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
     cursor: pointer;
-    display: grid;
-    place-items: center;
-    transition: background 0.2s, border 0.2s, transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.2s, border 0.2s, color 0.2s, transform 0.2s;
 }
 
 .contact-action-btn:hover {
     transform: translateY(-1px);
-    background: rgba(15, 23, 42, 0.08);
+    background: #f3f4f6;
 }
 
 .contact-action-btn.primary {
-    background: rgba(37, 99, 235, 0.12);
-    border-color: rgba(37, 99, 235, 0.28);
-    color: #1d4ed8;
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #ffffff;
 }
 
 .contact-action-btn.primary:hover {
-    background: rgba(37, 99, 235, 0.2);
+    background: #1e40af;
+}
+
+.contact-action-icon {
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
+    line-height: 1;
+}
+
+.contact-action-text {
+    line-height: 1;
 }
 
 .contact-tag {
