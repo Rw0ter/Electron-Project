@@ -221,8 +221,7 @@
                                         <span class="chat-action-icon">&#xE7F4;</span>
                                     </button>
                                     <div class="chat-action-remote" title="远程控制">
-                                        <button class="chat-action-btn" type="button"
-                                            @click.stop="toggleRemoteMenu">
+                                        <button class="chat-action-btn" type="button" @click.stop="toggleRemoteMenu">
                                             <span class="chat-action-icon">&#xE8A7;</span>
                                         </button>
                                         <div class="chat-action-menu" :class="{ open: showRemoteMenu }">
@@ -305,7 +304,7 @@
                                                     <div class="bubble-file-name">{{ getMessageFileName(msg) }}</div>
                                                     <div class="bubble-file-size">{{
                                                         formatBytes(getMessageFileSize(msg))
-                                                        }}</div>
+                                                    }}</div>
                                                 </div>
                                                 <button v-if="getMessageFileUrl(msg) && !isFileExpired(msg)"
                                                     class="bubble-file-link" type="button"
@@ -774,6 +773,7 @@ const mutedUids = ref([]);
 const unreadUids = ref([]);
 const hiddenUids = ref([]);
 const blockedUids = ref([]);
+const blockedAtByUid = ref({});
 const pendingChatUid = ref(null);
 const incomingRequests = ref([]);
 const outgoingRequests = ref([]);
@@ -893,6 +893,22 @@ const saveUidList = (key, list) => {
     } catch {}
 };
 
+const loadUidMap = (key) => {
+    try {
+        const raw = localStorage.getItem(key);
+        const parsed = JSON.parse(raw || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const saveUidMap = (key, map) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(map || {}));
+    } catch {}
+};
+
 const loadDownloadMap = () => {
     try {
         const raw = localStorage.getItem('vp_downloaded_files');
@@ -914,6 +930,7 @@ const loadFriendPreferences = () => {
     mutedUids.value = loadUidList('vp_muted_uids');
     hiddenUids.value = loadUidList('vp_hidden_uids');
     blockedUids.value = loadUidList('vp_blocked_uids');
+    blockedAtByUid.value = loadUidMap('vp_blocked_at');
 };
 
 const readFileAsDataUrl = (file) =>
@@ -997,6 +1014,12 @@ const isMuted = (uid) => mutedUids.value.includes(uid);
 const isUnread = (uid) => unreadUids.value.includes(uid);
 const isHidden = (uid) => hiddenUids.value.includes(uid);
 const isBlocked = (uid) => blockedUids.value.includes(uid);
+const getBlockedAt = (uid) => {
+    if (!uid) return null;
+    const raw = blockedAtByUid.value?.[uid];
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+};
 
 const updateHidden = (uid) => {
     if (hiddenUids.value.includes(uid)) {
@@ -1016,8 +1039,15 @@ const showInChatList = (uid) => {
 const updateBlocked = (uid) => {
     if (blockedUids.value.includes(uid)) {
         blockedUids.value = blockedUids.value.filter((item) => item !== uid);
+        const next = { ...blockedAtByUid.value };
+        delete next[uid];
+        blockedAtByUid.value = next;
+        saveUidMap('vp_blocked_at', next);
     } else {
         blockedUids.value = [...blockedUids.value, uid];
+        const next = { ...blockedAtByUid.value, [uid]: Date.now() };
+        blockedAtByUid.value = next;
+        saveUidMap('vp_blocked_at', next);
     }
     saveUidList('vp_blocked_uids', blockedUids.value);
 };
@@ -2383,7 +2413,15 @@ const displayMessages = computed(() => {
         ? localMessages.value.filter((item) => item.targetUid === targetUid)
         : [];
     const combined = [...messages.value, ...localForTarget];
-    return combined.slice().sort((a, b) => {
+    const blockedAt = getBlockedAt(targetUid);
+    const filtered = blockedAt
+        ? combined.filter((item) => {
+              if (item.senderUid !== targetUid) return true;
+              const createdAt = item.createdAt ? Date.parse(item.createdAt) : 0;
+              return !createdAt || createdAt <= blockedAt;
+          })
+        : combined;
+    return filtered.slice().sort((a, b) => {
         const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
         const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
         return aTime - bTime;
@@ -2611,6 +2649,18 @@ const loadFriends = async ({ silent } = {}) => {
             if (blockedUids.value.some((uid) => !knownUids.has(uid))) {
                 blockedUids.value = blockedUids.value.filter((uid) => knownUids.has(uid));
                 saveUidList('vp_blocked_uids', blockedUids.value);
+            }
+            const blockedAtEntries = Object.keys(blockedAtByUid.value || {});
+            if (blockedAtEntries.some((uid) => !knownUids.has(Number(uid)))) {
+                const next = {};
+                blockedAtEntries.forEach((uid) => {
+                    const num = Number(uid);
+                    if (knownUids.has(num)) {
+                        next[uid] = blockedAtByUid.value[uid];
+                    }
+                });
+                blockedAtByUid.value = next;
+                saveUidMap('vp_blocked_at', next);
             }
             if (pendingChatUid.value) {
                 const target = next.find((item) => item.uid === pendingChatUid.value);
@@ -4905,17 +4955,19 @@ select:focus {
     top: 70px;
     right: 0px;
     width: 260px;
-    max-height: calc(100vh - 180px);
+    max-height: calc(100vh - 0px);
     overflow-y: auto;
     display: grid;
-    gap: 12px;
+    gap: 38px;
     padding: 8px;
     opacity: 0;
     transform: translateX(12px);
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
     z-index: 19;
-    background-color: #fff;
+    background-color: #f2f2f2;
+    box-shadow: -4px 10px 10px 2px #cccccc;
+    border-radius: 10px;
 }
 
 .chat-side-panel.open {
@@ -4927,11 +4979,9 @@ select:focus {
 .chat-side-card {
     background: #ffffff;
     border-radius: 14px;
-    border: 1px solid rgba(15, 23, 42, 0.1);
     padding: 12px;
     display: grid;
     gap: 10px;
-    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
 .chat-side-row {
