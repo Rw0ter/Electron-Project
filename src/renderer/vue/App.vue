@@ -131,13 +131,8 @@
                                 <div class="list-sub">UID {{ friend.uid }}</div>
                             </div>
                             <div class="list-badges">
-                                <span v-if="isMuted(friend.uid)" class="list-badge mute">
-                                    免打扰
-                                    <span v-if="getUnreadCount(friend.uid)" class="mute-dot"></span>
-                                </span>
-                                <span v-if="getUnreadCount(friend.uid) && !isMuted(friend.uid)" class="list-badge">
-                                    {{ formatUnread(getUnreadCount(friend.uid)) }}
-                                </span>
+                                <span v-if="isMuted(friend.uid)" class="list-badge mute">免打扰</span>
+                                <span v-if="isUnread(friend.uid)" class="list-unread-dot"></span>
                             </div>
                         </button>
                         <div v-if="!filteredFriends.length" class="empty-state">
@@ -776,6 +771,7 @@ const listMenuFriend = ref(null);
 const listMenuRef = ref(null);
 const pinnedUids = ref([]);
 const mutedUids = ref([]);
+const unreadUids = ref([]);
 const pendingChatUid = ref(null);
 const incomingRequests = ref([]);
 const outgoingRequests = ref([]);
@@ -996,7 +992,7 @@ const clearAvatar = () => {
 
 const isPinned = (uid) => pinnedUids.value.includes(uid);
 const isMuted = (uid) => mutedUids.value.includes(uid);
-const isUnread = (uid) => getUnreadCount(uid) > 0;
+const isUnread = (uid) => unreadUids.value.includes(uid);
 
 const clampListMenuPosition = (x, y) => {
     const maxX = Math.max(LIST_MENU_MARGIN, window.innerWidth - LIST_MENU_WIDTH - LIST_MENU_MARGIN);
@@ -1052,15 +1048,15 @@ const removeMuted = (uid) => {
 };
 
 const markUnread = (uid) => {
-    if (!uid) return;
-    const current = getUnreadCount(uid);
-    if (current > 0) return;
-    setUnreadCount(uid, 1);
+    if (!uid || unreadUids.value.includes(uid)) return;
+    unreadUids.value = [...unreadUids.value, uid];
 };
 
 const clearUnread = (uid) => {
     if (!uid) return;
-    setUnreadCount(uid, 0);
+    if (unreadUids.value.includes(uid)) {
+        unreadUids.value = unreadUids.value.filter((item) => item !== uid);
+    }
 };
 
 const copyText = async (text) => {
@@ -1103,7 +1099,7 @@ const copyUidFromMenu = async () => {
 const toggleUnreadFromMenu = () => {
     const uid = listMenuFriend.value?.uid;
     if (!uid) return;
-    if (getUnreadCount(uid) > 0) {
+    if (unreadUids.value.includes(uid)) {
         clearUnread(uid);
     } else {
         markUnread(uid);
@@ -1528,17 +1524,12 @@ const handleWsMessage = (payload) => {
     messageIdSet.add(entry.id);
     const activeUid = activeFriend.value?.uid;
     if (entry.senderUid !== auth.value.uid) {
-        const isMutedSender = mutedUids.value.includes(entry.senderUid);
-        if (!isMutedSender) {
+        if (!mutedUids.value.includes(entry.senderUid)) {
             playNotifySound();
             flashWindow();
         }
-        if (entry.targetType === 'private') {
-            const isViewingChat = activeView.value === 'chat';
-            const isActiveSender = activeUid && entry.senderUid === activeUid;
-            if (!isViewingChat || !isActiveSender) {
-                incrementUnread(entry.senderUid);
-            }
+        if (entry.targetType === 'private' && entry.senderUid !== activeUid) {
+            markUnread(entry.senderUid);
         }
     }
     if (
@@ -1551,6 +1542,12 @@ const handleWsMessage = (payload) => {
         nextTick(() => {
             scrollToBottom();
         });
+    } else if (entry.targetType === 'private' && entry.senderUid !== auth.value.uid) {
+        const isViewingChat = activeView.value === 'chat';
+        const isActiveSender = activeUid && entry.senderUid === activeUid;
+        if (!isViewingChat || !isActiveSender) {
+            incrementUnread(entry.senderUid);
+        }
     }
 };
 
@@ -1624,11 +1621,7 @@ const incrementUnread = (uid) => {
 };
 
 const totalUnread = computed(() => {
-    const muted = new Set(mutedUids.value);
-    return Object.entries(unreadByUid.value).reduce((sum, [uid, count]) => {
-        if (muted.has(Number(uid))) return sum;
-        return sum + count;
-    }, 0);
+    return Object.values(unreadByUid.value).reduce((sum, count) => sum + count, 0);
 });
 
 const formatUnread = (count) => {
@@ -2654,6 +2647,7 @@ const loadMessages = async (targetUid, { silent, forceScroll } = {}) => {
 
 const selectFriend = async (friend) => {
     activeFriend.value = friend;
+    setUnreadCount(friend.uid, 0);
     clearUnread(friend?.uid);
     closeListMenu();
     await loadMessages(friend.uid, { forceScroll: true });
@@ -4121,16 +4115,13 @@ select:focus {
 .list-badge.mute {
     background: rgba(15, 23, 42, 0.08);
     color: #334155;
-    gap: 6px;
-    position: relative;
 }
 
-.mute-dot {
-    width: 6px;
-    height: 6px;
+.list-unread-dot {
+    width: 8px;
+    height: 8px;
     border-radius: 999px;
     background: #ef4444;
-    display: inline-block;
 }
 
 .list-context-menu {
