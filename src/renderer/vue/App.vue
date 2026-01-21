@@ -211,8 +211,7 @@
                             </div>
                             <div class="chat-actions">
                                 <div class="chat-actions-left">
-                                    <button class="chat-action-btn" type="button" title="语音通话"
-                                        @click="startVoiceCall">
+                                    <button class="chat-action-btn" type="button" title="语音通话" @click="startVoiceCall">
                                         <span class="chat-action-icon">&#xE717;</span>
                                     </button>
                                     <button class="chat-action-btn" type="button" title="视频通话">
@@ -316,6 +315,25 @@
                                                     已过期
                                                 </span>
                                                 <span v-else class="bubble-file-status">上传中</span>
+                                            </div>
+                                        </template>
+                                        <template v-else-if="msg.type === 'card'">
+                                            <div class="card-message">
+                                                <div class="card-title">个人名片</div>
+                                                <div class="card-main">
+                                                    <div class="card-avatar">
+                                                        <img v-if="getCardAvatar(msg)" :src="getCardAvatar(msg)"
+                                                            alt="avatar" />
+                                                        <span v-else>{{ getCardInitials(msg) }}</span>
+                                                    </div>
+                                                    <div class="card-meta">
+                                                        <div class="card-name">{{ getCardName(msg) }}</div>
+                                                        <div class="card-uid">UID {{ getCardUid(msg) }}</div>
+                                                    </div>
+                                                </div>
+                                                <div v-if="getCardNote(msg)" class="card-note">
+                                                    {{ getCardNote(msg) }}
+                                                </div>
                                             </div>
                                         </template>
                                         <span v-else>{{ renderMessage(msg) }}</span>
@@ -511,7 +529,7 @@
                                     </span>
                                 </div>
                                 <div class="contact-profile-actions">
-                                    <button class="contact-action-btn" type="button" title="分享">
+                                    <button class="contact-action-btn" type="button" title="分享" @click="openSharePanel">
                                         <span class="contact-action-icon">&#xE72D;</span>
                                         <span class="contact-action-text">分享</span>
                                     </button>
@@ -695,6 +713,62 @@
                 </div>
             </div>
         </transition>
+        <transition name="profile-modal" appear>
+            <div v-show="showSharePanel" class="share-modal">
+                <div class="profile-modal__backdrop" @click="closeSharePanel"></div>
+                <div class="share-panel">
+                    <div class="share-left">
+                        <div class="share-search">
+                            <span class="search-icon">&#128269;</span>
+                            <input v-model.trim="shareQuery" type="text" placeholder="搜索" />
+                        </div>
+                        <button class="share-create-btn" type="button">创建群聊并转发</button>
+                        <div class="share-section-title">最近聊天</div>
+                        <div class="share-list">
+                            <button v-for="friend in shareTargets" :key="`share-${friend.uid}`" class="share-item"
+                                type="button" @click="shareTargetUid = friend.uid">
+                                <span class="share-radio" :class="{ selected: shareTargetUid === friend.uid }"></span>
+                                <span class="share-avatar">
+                                    <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                    <span v-else>{{ friend.username?.slice(0, 2).toUpperCase() }}</span>
+                                </span>
+                                <span class="share-name">{{ friend.nickname || friend.username }}</span>
+                            </button>
+                            <div v-if="!shareTargets.length" class="share-empty">暂无最近聊天</div>
+                        </div>
+                    </div>
+                    <div class="share-right">
+                        <div class="share-header">分享至：</div>
+                        <div class="share-target-name">{{ shareTargetName || '请选择好友' }}</div>
+                        <div class="share-card">
+                            <div class="share-card-title">名片</div>
+                            <div class="share-card-main">
+                                <div class="share-card-avatar">
+                                    <img v-if="shareCardAvatar" :src="shareCardAvatar" alt="avatar" />
+                                    <span v-else>{{ shareCardInitials }}</span>
+                                </div>
+                                <div class="share-card-meta">
+                                    <div class="share-card-name">{{ shareCardName }}</div>
+                                    <div class="share-card-uid">UID {{ shareCardUid }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="share-note">
+                            <textarea v-model.trim="shareNote" placeholder="留言"></textarea>
+                        </div>
+                        <div class="share-actions">
+                            <button class="share-confirm" type="button" :disabled="!shareTargetUid"
+                                @click="confirmShareCard">
+                                确定
+                            </button>
+                            <button class="share-cancel" type="button" @click="closeSharePanel">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
         <transition name="file-modal" appear>
             <div v-show="isFileModalOpen" class="file-modal">
                 <div class="file-modal__backdrop" @click="closeFileModal"></div>
@@ -775,6 +849,7 @@ const unreadUids = ref([]);
 const hiddenUids = ref([]);
 const blockedUids = ref([]);
 const blockedAtByUid = ref({});
+const recentChatMap = ref({});
 const pendingChatUid = ref(null);
 const incomingRequests = ref([]);
 const outgoingRequests = ref([]);
@@ -782,6 +857,7 @@ const showSendMenu = ref(false);
 const showEmojiPicker = ref(false);
 const showMorePanel = ref(false);
 const showRemoteMenu = ref(false);
+const showSharePanel = ref(false);
 const emojiTab = ref('recent');
 const recentEmojis = ref([]);
 const isFriendProfileVisible = ref(false);
@@ -792,6 +868,10 @@ const selectedContact = ref(null);
 const contactProfile = ref(null);
 const contactProfileLoading = ref(false);
 const blockNotice = ref({ uid: null, text: '' });
+const shareQuery = ref('');
+const shareTargetUid = ref(null);
+const shareNote = ref('');
+const shareCardSource = ref(null);
 const emojiPickerRef = ref(null);
 const emojiButtonRef = ref(null);
 const morePanelRef = ref(null);
@@ -932,6 +1012,7 @@ const loadFriendPreferences = () => {
     hiddenUids.value = loadUidList('vp_hidden_uids');
     blockedUids.value = loadUidList('vp_blocked_uids');
     blockedAtByUid.value = loadUidMap('vp_blocked_at');
+    recentChatMap.value = loadUidMap('vp_recent_chats');
 };
 
 const readFileAsDataUrl = (file) =>
@@ -1051,6 +1132,20 @@ const updateBlocked = (uid) => {
         saveUidMap('vp_blocked_at', next);
     }
     saveUidList('vp_blocked_uids', blockedUids.value);
+};
+
+const updateRecentChat = (uid) => {
+    if (!uid) return;
+    const next = { ...recentChatMap.value, [uid]: Date.now() };
+    recentChatMap.value = next;
+    saveUidMap('vp_recent_chats', next);
+};
+
+const resetSharePanelState = () => {
+    shareQuery.value = '';
+    shareNote.value = '';
+    shareTargetUid.value = null;
+    shareCardSource.value = null;
 };
 
 const clampListMenuPosition = (x, y) => {
@@ -1586,6 +1681,18 @@ const handleWsMessage = (payload) => {
     }
     messageIdSet.add(entry.id);
     const activeUid = activeFriend.value?.uid;
+    if (entry.targetType === 'private') {
+        const otherUid =
+            entry.senderUid === auth.value.uid ? entry.targetUid : entry.senderUid;
+        if (entry.senderUid !== auth.value.uid) {
+            const blockedAt = getBlockedAt(entry.senderUid);
+            const createdAt = entry.createdAt ? Date.parse(entry.createdAt) : 0;
+            if (blockedAt && createdAt && createdAt > blockedAt) {
+                return;
+            }
+        }
+        updateRecentChat(otherUid);
+    }
     if (entry.senderUid !== auth.value.uid) {
         if (!mutedUids.value.includes(entry.senderUid)) {
             playNotifySound();
@@ -2146,6 +2253,46 @@ const blockActionLabel = computed(() =>
     isActiveBlocked.value ? '取消屏蔽此人' : '屏蔽此人'
 );
 
+const shareTargets = computed(() => {
+    const query = shareQuery.value.trim().toLowerCase();
+    const list = friends.value || [];
+    const entries = list
+        .filter((item) => recentChatMap.value?.[item.uid])
+        .sort((a, b) => {
+            const aTime = Number(recentChatMap.value?.[a.uid]) || 0;
+            const bTime = Number(recentChatMap.value?.[b.uid]) || 0;
+            return bTime - aTime;
+        });
+    if (!query) return entries;
+    return entries.filter(
+        (item) =>
+            item.username?.toLowerCase().includes(query) ||
+            item.nickname?.toLowerCase().includes(query) ||
+            String(item.uid).includes(query)
+    );
+});
+
+const shareTargetName = computed(() => {
+    const target = shareTargets.value.find((item) => item.uid === shareTargetUid.value);
+    return target?.nickname || target?.username || '';
+});
+
+const shareCardName = computed(() => {
+    const source = shareCardSource.value;
+    if (!source) return '';
+    return source.nickname || source.username || `用户${source.uid || ''}`;
+});
+
+const shareCardUid = computed(() => shareCardSource.value?.uid || '');
+
+const shareCardAvatar = computed(() => shareCardSource.value?.avatar || '');
+
+const shareCardInitials = computed(() => {
+    const source = shareCardSource.value;
+    const base = source?.username || shareCardName.value || '??';
+    return String(base).slice(0, 2).toUpperCase();
+});
+
 const nicknameCount = computed(() => editForm.value.nickname.length);
 const signatureCount = computed(() => editForm.value.signature.length);
 
@@ -2244,7 +2391,41 @@ const renderMessage = (msg) => {
     if (msg.type === 'voice') return '[语音消息]';
     if (msg.type === 'gif') return '[GIF 表情]';
     if (msg.type === 'file') return '[文件]';
+    if (msg.type === 'card') return '[名片]';
     return '[未知消息]';
+};
+
+const getCardPayload = (msg) => {
+    if (msg?.type !== 'card') return {};
+    const card = msg.data?.card;
+    return card && typeof card === 'object' ? card : {};
+};
+
+const getCardName = (msg) => {
+    const card = getCardPayload(msg);
+    const name = card.nickname || card.username || `用户${card.uid || ''}`;
+    return sanitizeText(name);
+};
+
+const getCardUid = (msg) => {
+    const card = getCardPayload(msg);
+    return card.uid || '---';
+};
+
+const getCardAvatar = (msg) => {
+    const card = getCardPayload(msg);
+    return typeof card.avatar === 'string' ? card.avatar : '';
+};
+
+const getCardInitials = (msg) => {
+    const card = getCardPayload(msg);
+    const base = card.username || card.nickname || '??';
+    return String(base).slice(0, 2).toUpperCase();
+};
+
+const getCardNote = (msg) => {
+    const note = msg?.data?.note;
+    return typeof note === 'string' ? sanitizeText(note) : '';
 };
 
 const getMessageFile = (msg) => {
@@ -2741,6 +2922,18 @@ const loadFriends = async ({ silent } = {}) => {
                 blockedAtByUid.value = next;
                 saveUidMap('vp_blocked_at', next);
             }
+            const recentEntries = Object.keys(recentChatMap.value || {});
+            if (recentEntries.some((uid) => !knownUids.has(Number(uid)))) {
+                const next = {};
+                recentEntries.forEach((uid) => {
+                    const num = Number(uid);
+                    if (knownUids.has(num)) {
+                        next[uid] = recentChatMap.value[uid];
+                    }
+                });
+                recentChatMap.value = next;
+                saveUidMap('vp_recent_chats', next);
+            }
             if (pendingChatUid.value) {
                 const target = next.find((item) => item.uid === pendingChatUid.value);
                 if (target) {
@@ -2806,6 +2999,7 @@ const selectFriend = async (friend) => {
     activeFriend.value = friend;
     setUnreadCount(friend.uid, 0);
     clearUnread(friend?.uid);
+    updateRecentChat(friend?.uid);
     closeListMenu();
     await loadMessages(friend.uid, { forceScroll: true });
     await nextTick();
@@ -2834,13 +3028,57 @@ const enterChatFromContact = async () => {
     await selectFriend(target);
 };
 
-const sendChatEntry = async ({ type, data, payload }) => {
+const openSharePanel = () => {
+    const source = contactProfileSource.value || selectedContact.value;
+    if (!source?.uid) return;
+    shareCardSource.value = source;
+    shareQuery.value = '';
+    shareNote.value = '';
+    const list = shareTargets.value;
+    shareTargetUid.value = list.length ? list[0].uid : null;
+    showSharePanel.value = true;
+};
+
+const closeSharePanel = () => {
+    showSharePanel.value = false;
+    resetSharePanelState();
+};
+
+const confirmShareCard = async () => {
+    const targetUid = shareTargetUid.value;
+    const source = shareCardSource.value;
+    if (!targetUid || !source?.uid) {
+        statusText.value = '请选择分享对象';
+        return;
+    }
+    const card = {
+        uid: source.uid,
+        username: source.username || '',
+        nickname: source.nickname || '',
+        avatar: source.avatar || ''
+    };
+    const note = sanitizeText(shareNote.value).trim();
+    const ok = await sendChatEntryTo({
+        type: 'card',
+        targetUid,
+        data: { card, note },
+        payload: { card, note }
+    });
+    if (ok) {
+        updateRecentChat(targetUid);
+        statusText.value = '名片已分享';
+        closeSharePanel();
+    }
+};
+
+const sendChatEntryTo = async ({ type, data, payload, targetUid }) => {
+    if (!targetUid) return false;
     const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const localEntry = {
         id: localId,
         type,
         senderUid: auth.value.uid,
-        targetUid: activeFriend.value.uid,
+        targetUid,
         targetType: 'private',
         data,
         createdAt: new Date().toISOString(),
@@ -2857,7 +3095,68 @@ const sendChatEntry = async ({ type, data, payload }) => {
             },
             body: JSON.stringify({
                 senderUid: auth.value.uid,
-                targetUid: activeFriend.value.uid,
+                targetUid,
+                targetType: 'private',
+                type,
+                ...payload
+            })
+        });
+        const result = await res.json();
+        if (res.ok && result?.success) {
+            if (result.data?.id && !messageIdSet.has(result.data.id)) {
+                messageIdSet.add(result.data.id);
+                if (activeFriend.value?.uid === targetUid) {
+                    messages.value = [...messages.value, result.data];
+                }
+            }
+            if (activeFriend.value?.uid === targetUid) {
+                await nextTick();
+                scrollToBottom();
+            }
+            localMessages.value = localMessages.value.filter((item) => item.id !== localId);
+            updateRecentChat(targetUid);
+            return true;
+        }
+        localMessages.value = localMessages.value.map((item) =>
+            item.id === localId ? { ...item, pending: false, error: true } : item
+        );
+        statusText.value = result?.message || '发送失败';
+        return false;
+    } catch (err) {
+        localMessages.value = localMessages.value.map((item) =>
+            item.id === localId ? { ...item, pending: false, error: true } : item
+        );
+        statusText.value = '发送失败';
+        return false;
+    }
+};
+
+const sendChatEntry = async ({ type, data, payload }) => {
+    const targetUid = activeFriend.value?.uid;
+    if (!targetUid) return false;
+    const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const localEntry = {
+        id: localId,
+        type,
+        senderUid: auth.value.uid,
+        targetUid,
+        targetType: 'private',
+        data,
+        createdAt: new Date().toISOString(),
+        pending: true,
+        error: false
+    };
+    localMessages.value = [...localMessages.value, localEntry];
+    try {
+        const res = await fetch(`${API_BASE}/api/chat/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeader()
+            },
+            body: JSON.stringify({
+                senderUid: auth.value.uid,
+                targetUid,
                 targetType: 'private',
                 type,
                 ...payload
@@ -2872,6 +3171,7 @@ const sendChatEntry = async ({ type, data, payload }) => {
             await nextTick();
             scrollToBottom();
             localMessages.value = localMessages.value.filter((item) => item.id !== localId);
+            updateRecentChat(targetUid);
             return true;
         }
         localMessages.value = localMessages.value.map((item) =>
@@ -4945,6 +5245,67 @@ select:focus {
     margin-top: 8px;
 }
 
+.card-message {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    color: #111827;
+}
+
+.card-title {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.card-main {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.card-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    overflow: hidden;
+}
+
+.card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.card-meta {
+    display: grid;
+    gap: 4px;
+}
+
+.card-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.card-uid {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.card-note {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
 .serach_input_box {
     display: flex;
     align-items: center;
@@ -5434,5 +5795,259 @@ select:focus {
     align-items: center;
     justify-content: center;
     user-select: none;
+}
+
+.share-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+}
+
+.share-panel {
+    width: 720px;
+    max-width: calc(100vw - 40px);
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+    position: fixed;
+}
+
+.share-left {
+    padding: 18px;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+    display: grid;
+    gap: 12px;
+}
+
+.share-search {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 8px;
+    background: #f3f4f6;
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.share-search input {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+}
+
+.share-search input:focus {
+    outline: none;
+}
+
+.share-create-btn {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #111827;
+}
+
+.share-section-title {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.share-list {
+    display: grid;
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.share-item {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    background: transparent;
+    padding: 6px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.share-item:hover {
+    background: rgba(15, 23, 42, 0.04);
+}
+
+.share-radio {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #d1d5db;
+    display: grid;
+    place-items: center;
+}
+
+.share-radio.selected {
+    border-color: #60a5fa;
+    box-shadow: inset 0 0 0 4px #60a5fa;
+}
+
+.share-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    font-size: 11px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.share-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.share-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.share-empty {
+    font-size: 12px;
+    color: #9ca3af;
+    padding: 12px 4px;
+}
+
+.share-right {
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+    align-content: start;
+}
+
+.share-header {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.share-target-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.share-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    background: #f9fafb;
+}
+
+.share-card-title {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.share-card-main {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.share-card-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-weight: 600;
+}
+
+.share-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.share-card-meta {
+    display: grid;
+    gap: 4px;
+}
+
+.share-card-name {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.share-card-uid {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.share-note textarea {
+    width: 100%;
+    min-height: 80px;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    padding: 10px;
+    resize: none;
+    font-size: 12px;
+    background: #ffffff;
+}
+
+.share-note textarea:focus {
+    outline: none;
+    border-color: rgba(37, 99, 235, 0.4);
+}
+
+.share-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.share-confirm,
+.share-cancel {
+    border: none;
+    border-radius: 12px;
+    padding: 8px 18px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.share-confirm {
+    background: #60a5fa;
+    color: #fff;
+}
+
+.share-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.share-cancel {
+    background: #f3f4f6;
+    color: #374151;
 }
 </style>

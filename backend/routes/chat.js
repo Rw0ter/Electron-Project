@@ -17,7 +17,7 @@ const DB_PATH = path.join(DATA_DIR, 'chat.sqlite');
 const DB_TMP_PATH = path.join(DATA_DIR, 'chat.sqlite.tmp');
 
 const router = express.Router();
-const ALLOWED_TYPES = new Set(['image', 'video', 'voice', 'text', 'gif', 'file']);
+const ALLOWED_TYPES = new Set(['image', 'video', 'voice', 'text', 'gif', 'file', 'card', 'call']);
 const ALLOWED_TARGET_TYPES = new Set(['private', 'group']);
 const MAX_LIMIT = 500;
 const FLUSH_INTERVAL_MS = 250;
