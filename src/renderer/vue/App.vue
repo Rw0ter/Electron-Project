@@ -342,9 +342,6 @@
                             <button class="tool-icon-btn" title="图片" @click="triggerImageSelect">
                                 <span class="tool-glyph">&#xEB9F;</span>
                             </button>
-                            <button class="tool-icon-btn" title="红包">
-                                <span class="tool-glyph">&#xE7C3;</span>
-                            </button>
                             <button class="tool-icon-btn" title="语音">
                                 <span class="tool-glyph">&#xE720;</span>
                             </button>
