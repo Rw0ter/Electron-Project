@@ -76,7 +76,7 @@
                     <button class="rail-btn" :class="{ active: activeView === 'chat' }" title="消息"
                         @click="activeView = 'chat'">
                         <span class="rail-icon">&#xE8BD;</span>
-                        <span class="rail-badge">99+</span>
+                        <span v-if="totalUnread" class="rail-badge">{{ formatUnread(totalUnread) }}</span>
                     </button>
                     <button class="rail-btn" :class="{ active: activeView === 'contacts' }" title="联系人"
                         @click="openContacts">
@@ -129,6 +129,9 @@
                                 <div class="list-name">{{ friend.username }}</div>
                                 <div class="list-sub">UID {{ friend.uid }}</div>
                             </div>
+                            <span v-if="getUnreadCount(friend.uid)" class="list-badge">
+                                {{ formatUnread(getUnreadCount(friend.uid)) }}
+                            </span>
                         </button>
                         <div v-if="!filteredFriends.length" class="empty-state">
                             暂无好友，请先添加好友。
@@ -554,6 +557,7 @@ const friends = ref([]);
 const activeFriend = ref(null);
 const messages = ref([]);
 const localMessages = ref([]);
+const unreadByUid = ref({});
 const chatBodyRef = ref(null);
 const wsRef = ref(null);
 const draft = ref('');
@@ -1043,6 +1047,12 @@ const handleWsMessage = (payload) => {
         nextTick(() => {
             scrollToBottom();
         });
+    } else if (entry.targetType === 'private' && entry.senderUid !== auth.value.uid) {
+        const isViewingChat = activeView.value === 'chat';
+        const isActiveSender = activeUid && entry.senderUid === activeUid;
+        if (!isViewingChat || !isActiveSender) {
+            incrementUnread(entry.senderUid);
+        }
     }
 };
 
@@ -1091,6 +1101,37 @@ const connectWebSocket = () => {
 const openContacts = async () => {
     activeView.value = 'contacts';
     await loadRequests({ silent: true });
+};
+
+const getUnreadCount = (uid) => {
+    const key = String(uid ?? '');
+    return unreadByUid.value[key] || 0;
+};
+
+const setUnreadCount = (uid, count) => {
+    const key = String(uid ?? '');
+    const next = { ...unreadByUid.value };
+    if (!count) {
+        delete next[key];
+    } else {
+        next[key] = count;
+    }
+    unreadByUid.value = next;
+};
+
+const incrementUnread = (uid) => {
+    if (!uid) return;
+    const current = getUnreadCount(uid);
+    setUnreadCount(uid, current + 1);
+};
+
+const totalUnread = computed(() => {
+    return Object.values(unreadByUid.value).reduce((sum, count) => sum + count, 0);
+});
+
+const formatUnread = (count) => {
+    if (!count) return '';
+    return count > 99 ? '99+' : String(count);
 };
 const toggleSendMenu = () => {
     showSendMenu.value = !showSendMenu.value;
@@ -1707,6 +1748,7 @@ const loadMessages = async (targetUid, { silent, forceScroll } = {}) => {
 
 const selectFriend = async (friend) => {
     activeFriend.value = friend;
+    setUnreadCount(friend.uid, 0);
     await loadMessages(friend.uid, { forceScroll: true });
     await nextTick();
     scheduleScrollToBottom();
@@ -2783,7 +2825,7 @@ select:focus {
 
 .list-item {
     display: grid;
-    grid-template-columns: 42px 1fr;
+    grid-template-columns: 42px 1fr auto;
     gap: 12px;
     align-items: center;
     text-align: left;
@@ -2846,6 +2888,21 @@ select:focus {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.list-badge {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ff5a3c;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 12px rgba(255, 90, 60, 0.25);
 }
 
 
