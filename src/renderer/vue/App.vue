@@ -1669,6 +1669,15 @@ const handleWsMessage = (payload) => {
         message.data.forEach((entry) => applyPresenceUpdate(entry));
         return;
     }
+    if (message.type === 'voice_signal_status' && message.data) {
+        const status = message.data.status;
+        if (status === 'offline') {
+            statusText.value = '对方当前不在线，无法接听';
+        } else if (status === 'not_friend') {
+            statusText.value = '对方不是好友，无法呼叫';
+        }
+        return;
+    }
     if (message.type === 'voice_signal' && message.data) {
         handleVoiceSignalFromServer(message.data);
         return;

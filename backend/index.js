@@ -27,7 +27,8 @@ const PORT = process.env.PORT || 3001;
 
 export const app = express();
 
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
@@ -429,6 +430,19 @@ app.use('/api/chat', chatRouter);
 app.use('/api/friends', friendsRouter);
 app.use('/api/voice', voiceRouter);
 
+app.use((err, req, res, next) => {
+  if (!err) {
+    next();
+    return;
+  }
+  if (err.type === 'entity.too.large') {
+    res.status(413).json({ success: false, message: 'Payload too large.' });
+    return;
+  }
+  console.error('Unhandled server error:', err);
+  res.status(500).json({ success: false, message: 'Server error.' });
+});
+
 export function startServer(port = PORT) {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
@@ -572,14 +586,36 @@ export function startServer(port = PORT) {
             const targetUid = Number(message?.data?.targetUid);
             if (!Number.isInteger(targetUid)) return;
             if (!Array.isArray(user.friends) || !user.friends.includes(targetUid)) {
+              socket.send(
+                JSON.stringify({
+                  type: 'voice_signal_status',
+                  data: { targetUid, status: 'not_friend' },
+                })
+              );
               return;
             }
             const signal = message?.data?.signal || null;
             if (!signal) return;
+            const targetConnections = connections.get(targetUid);
+            if (!targetConnections || targetConnections.size === 0) {
+              socket.send(
+                JSON.stringify({
+                  type: 'voice_signal_status',
+                  data: { targetUid, status: 'offline' },
+                })
+              );
+              return;
+            }
             sendToUid(targetUid, {
               type: 'voice_signal',
               data: { fromUid: user.uid, signal },
             });
+            socket.send(
+              JSON.stringify({
+                type: 'voice_signal_status',
+                data: { targetUid, status: 'sent' },
+              })
+            );
             return;
           }
         } catch {}

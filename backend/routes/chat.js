@@ -317,6 +317,11 @@ const migrateChatJson = async () => {
     return;
   }
   try {
+    await fs.access(CHAT_JSON_PATH);
+  } catch {
+    return;
+  }
+  try {
     const raw = await fs.readFile(CHAT_JSON_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) {
