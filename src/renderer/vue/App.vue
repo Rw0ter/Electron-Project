@@ -2326,7 +2326,7 @@ onBeforeUnmount(() => {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    padding: 0 18px;
+    padding: 0 10px;
     position: relative;
     z-index: 2;
     -webkit-app-region: drag;
@@ -2865,7 +2865,7 @@ select:focus {
 
 .wc-btn {
     width: 40px;
-    height: 28px;
+    height: 40px;
     background: transparent;
     border: none;
     color: #6b7280;
