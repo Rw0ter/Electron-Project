@@ -120,7 +120,8 @@
                     <div class="list">
                         <div class="section-title">私聊列表</div>
                         <button v-for="friend in filteredFriends" :key="friend.uid" class="list-item"
-                            :class="{ active: activeFriend?.uid === friend.uid }" @click="selectFriend(friend)"
+                            :class="{ active: activeFriend?.uid === friend.uid, pinned: isPinned(friend.uid) }"
+                            @click="selectFriend(friend)"
                             @contextmenu.prevent="openListMenu(friend, $event)">
                             <div class="avatar">
                                 <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
@@ -131,7 +132,6 @@
                                 <div class="list-sub">UID {{ friend.uid }}</div>
                             </div>
                             <div class="list-badges">
-                                <span v-if="isPinned(friend.uid)" class="list-badge">置顶</span>
                                 <span v-if="isMuted(friend.uid)" class="list-badge mute">免打扰</span>
                                 <span v-if="isUnread(friend.uid)" class="list-unread-dot"></span>
                             </div>
@@ -3166,6 +3166,11 @@ select:focus {
 .list-item.active {
     border-color: rgba(72, 147, 214, 0.6);
     box-shadow: 0 12px 20px rgba(72, 147, 214, 0.18);
+}
+
+.list-item.pinned {
+    background: rgba(31, 76, 122, 0.08);
+    border-color: rgba(31, 76, 122, 0.2);
 }
 
 .avatar {
