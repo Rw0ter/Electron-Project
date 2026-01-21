@@ -121,8 +121,7 @@
                         <div class="section-title">私聊列表</div>
                         <button v-for="friend in filteredFriends" :key="friend.uid" class="list-item"
                             :class="{ active: activeFriend?.uid === friend.uid, pinned: isPinned(friend.uid) }"
-                            @click="selectFriend(friend)"
-                            @contextmenu.prevent="openListMenu(friend, $event)">
+                            @click="selectFriend(friend)" @contextmenu.prevent="openListMenu(friend, $event)">
                             <div class="avatar">
                                 <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
                                 <span v-else>{{ friend.username?.slice(0, 2).toUpperCase() }}</span>
@@ -211,9 +210,37 @@
                                 </div>
                             </div>
                             <div class="chat-actions">
-                                <span class="chip">private</span>
+                                <div class="chat-actions-left">
+                                    <button class="chat-action-btn" type="button" title="语音通话">
+                                        <span class="chat-action-icon">&#xE717;</span>
+                                    </button>
+                                    <button class="chat-action-btn" type="button" title="视频通话">
+                                        <span class="chat-action-icon">&#xE714;</span>
+                                    </button>
+                                    <button class="chat-action-btn" type="button" title="屏幕分享">
+                                        <span class="chat-action-icon">&#xE7F4;</span>
+                                    </button>
+                                    <div class="chat-action-remote" title="远程控制">
+                                        <button class="chat-action-btn" type="button"
+                                            @click.stop="toggleRemoteMenu">
+                                            <span class="chat-action-icon">&#xE8A7;</span>
+                                        </button>
+                                        <div class="chat-action-menu" :class="{ open: showRemoteMenu }">
+                                            <button class="chat-action-menu-item" type="button">
+                                                远程控制对方电脑
+                                            </button>
+                                            <button class="chat-action-menu-item" type="button">
+                                                邀请对方远程协助
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button class="chat-action-btn" type="button" title="发起群聊">
+                                        <span class="chat-action-icon">&#xE902;</span>
+                                    </button>
+                                </div>
+                                <span class="chip">私聊</span>
                                 <span class="chip" :class="{ offline: !activeFriendOnline }">
-                                    {{ activeFriendOnline ? 'online' : 'offline' }}
+                                    {{ activeFriendOnline ? '在线' : '离线' }}
                                 </span>
                             </div>
                             <div v-if="activeFriend" ref="friendProfileRef" class="friend-profile-popover"
@@ -264,9 +291,8 @@
                                         <template v-if="msg.type === 'image'">
                                             <div class="bubble-image-grid">
                                                 <img v-for="(url, index) in getMessageImageUrls(msg)"
-                                                    :key="`${msg.id || 'img'}-${index}`" class="bubble-image"
-                                                    :src="url" alt="image"
-                                                    @dblclick.stop="openImagePreview(url)" />
+                                                    :key="`${msg.id || 'img'}-${index}`" class="bubble-image" :src="url"
+                                                    alt="image" @dblclick.stop="openImagePreview(url)" />
                                             </div>
                                             <div v-if="getMessageImageCaption(msg)" class="bubble-caption">
                                                 {{ getMessageImageCaption(msg) }}
@@ -277,8 +303,9 @@
                                                 <div class="bubble-file-icon">&#xE8A5;</div>
                                                 <div class="bubble-file-meta">
                                                     <div class="bubble-file-name">{{ getMessageFileName(msg) }}</div>
-                                                    <div class="bubble-file-size">{{ formatBytes(getMessageFileSize(msg))
-                                                    }}</div>
+                                                    <div class="bubble-file-size">{{
+                                                        formatBytes(getMessageFileSize(msg))
+                                                        }}</div>
                                                 </div>
                                                 <button v-if="getMessageFileUrl(msg) && !isFileExpired(msg)"
                                                     class="bubble-file-link" type="button"
@@ -294,6 +321,9 @@
                                         <span v-else>{{ renderMessage(msg) }}</span>
                                     </div>
                                     <div class="bubble-time">{{ formatTime(msg.createdAt) }}</div>
+                                </div>
+                                <div v-if="blockNoticeText" class="chat-block-notice">
+                                    {{ blockNoticeText }}
                                 </div>
                             </div>
                         </div>
@@ -337,8 +367,7 @@
                             <input ref="fileInputRef" class="composer-file-input" type="file"
                                 @change="handleFileSelect" />
                             <input ref="imageInputRef" class="composer-image-input" type="file" accept="image/*"
-                                multiple
-                                @change="handleImageSelect" />
+                                multiple @change="handleImageSelect" />
                             <button class="tool-icon-btn" title="图片" @click="triggerImageSelect">
                                 <span class="tool-glyph">&#xEB9F;</span>
                             </button>
@@ -349,7 +378,8 @@
                                 <span class="tool-glyph">&#xE720;</span>
                             </button>
                             <div class="tool-spacer"></div>
-                            <button class="tool-icon-btn" title="更多">
+                            <button class="tool-icon-btn" title="更多" :class="{ 'is-active': showMorePanel }"
+                                @click.stop="toggleMorePanel">
                                 <span class="tool-glyph">&#xE712;</span>
                             </button>
                         </div>
@@ -388,14 +418,52 @@
                             </div>
                         </div>
                     </div>
+                    <div v-if="showMorePanel" class="chat-side-overlay" @click="closeMorePanel"></div>
+                    <aside ref="morePanelRef" class="chat-side-panel" :class="{ open: showMorePanel }" @click.stop>
+                        <div class="chat-side-card">
+                            <div class="chat-side-row">
+                                <span>设为置顶</span>
+                                <label class="chat-switch">
+                                    <input type="checkbox" :checked="isActivePinned" @change="toggleActivePinned" />
+                                    <span class="chat-switch-slider"></span>
+                                </label>
+                            </div>
+                            <div class="chat-side-row">
+                                <span>消息免打扰</span>
+                                <label class="chat-switch">
+                                    <input type="checkbox" :checked="isActiveMuted" @change="toggleActiveMuted" />
+                                    <span class="chat-switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="chat-side-card">
+                            <button class="chat-side-action" type="button" @click="handlePanelAction('block')">
+                                {{ blockActionLabel }}
+                            </button>
+                            <button class="chat-side-action" type="button" @click="handlePanelAction('files')">
+                                文件传输列表
+                                <span class="chat-side-chev">&#xE76C;</span>
+                            </button>
+                            <button class="chat-side-action" type="button" @click="handlePanelAction('clear')">
+                                删除聊天记录
+                            </button>
+                        </div>
+                        <div class="chat-side-card">
+                            <button class="chat-side-danger" type="button" @click="handlePanelAction('remove')">
+                                删除好友
+                            </button>
+                        </div>
+                        <button class="chat-side-link" type="button" @click="handlePanelAction('report')">
+                            被骚扰了？举报该用户
+                        </button>
+                    </aside>
                 </template>
 
                 <div v-else class="contacts-panel">
                     <div class="contacts-header">
                         <div class="contacts-title">{{ contactsPanelTitle }}</div>
                         <div class="contacts-tools">
-                            <button v-if="selectedContact" class="tool-btn" title="返回"
-                                @click="clearContactProfile">
+                            <button v-if="selectedContact" class="tool-btn" title="返回" @click="clearContactProfile">
                                 <span class="tool-icon">&#xE72B;</span>
                             </button>
                             <template v-else>
@@ -430,15 +498,18 @@
                                             </div>
                                             <div class="profile-detail">
                                                 城市：{{ contactProfileSource?.country || '未设置' }}{{
-                                                    contactProfileSource?.province ? ` / ${contactProfileSource?.province}` :
-                                                        '' }}{{ contactProfileSource?.region ? ` / ${contactProfileSource?.region}` :
-                                                '' }}
+                                                    contactProfileSource?.province ? ` / ${contactProfileSource?.province}`
+                                                        :
+                                                        '' }}{{ contactProfileSource?.region ? ` /
+                                                ${contactProfileSource?.region}` :
+                                                    '' }}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="contact-profile-meta">
-                                    <span class="contact-tag" :class="{ offline: contactProfileSource?.online === false }">
+                                    <span class="contact-tag"
+                                        :class="{ offline: contactProfileSource?.online === false }">
                                         {{ contactProfileSource?.online === false ? '离线' : '在线' }}
                                     </span>
                                 </div>
@@ -704,11 +775,15 @@ const listMenuRef = ref(null);
 const pinnedUids = ref([]);
 const mutedUids = ref([]);
 const unreadUids = ref([]);
+const hiddenUids = ref([]);
+const blockedUids = ref([]);
 const pendingChatUid = ref(null);
 const incomingRequests = ref([]);
 const outgoingRequests = ref([]);
 const showSendMenu = ref(false);
 const showEmojiPicker = ref(false);
+const showMorePanel = ref(false);
+const showRemoteMenu = ref(false);
 const emojiTab = ref('recent');
 const recentEmojis = ref([]);
 const isFriendProfileVisible = ref(false);
@@ -718,8 +793,10 @@ const friendProfileLoading = ref(false);
 const selectedContact = ref(null);
 const contactProfile = ref(null);
 const contactProfileLoading = ref(false);
+const blockNotice = ref({ uid: null, text: '' });
 const emojiPickerRef = ref(null);
 const emojiButtonRef = ref(null);
+const morePanelRef = ref(null);
 const emojiPanelStyle = ref({});
 const composerHeight = ref(210);
 const isResizingComposer = ref(false);
@@ -838,6 +915,8 @@ const saveDownloadMap = (map) => {
 const loadFriendPreferences = () => {
     pinnedUids.value = loadUidList('vp_pinned_uids');
     mutedUids.value = loadUidList('vp_muted_uids');
+    hiddenUids.value = loadUidList('vp_hidden_uids');
+    blockedUids.value = loadUidList('vp_blocked_uids');
 };
 
 const readFileAsDataUrl = (file) =>
@@ -919,6 +998,32 @@ const clearAvatar = () => {
 const isPinned = (uid) => pinnedUids.value.includes(uid);
 const isMuted = (uid) => mutedUids.value.includes(uid);
 const isUnread = (uid) => unreadUids.value.includes(uid);
+const isHidden = (uid) => hiddenUids.value.includes(uid);
+const isBlocked = (uid) => blockedUids.value.includes(uid);
+
+const updateHidden = (uid) => {
+    if (hiddenUids.value.includes(uid)) {
+        hiddenUids.value = hiddenUids.value.filter((item) => item !== uid);
+    } else {
+        hiddenUids.value = [...hiddenUids.value, uid];
+    }
+    saveUidList('vp_hidden_uids', hiddenUids.value);
+};
+
+const showInChatList = (uid) => {
+    if (!uid || !hiddenUids.value.includes(uid)) return;
+    hiddenUids.value = hiddenUids.value.filter((item) => item !== uid);
+    saveUidList('vp_hidden_uids', hiddenUids.value);
+};
+
+const updateBlocked = (uid) => {
+    if (blockedUids.value.includes(uid)) {
+        blockedUids.value = blockedUids.value.filter((item) => item !== uid);
+    } else {
+        blockedUids.value = [...blockedUids.value, uid];
+    }
+    saveUidList('vp_blocked_uids', blockedUids.value);
+};
 
 const clampListMenuPosition = (x, y) => {
     const maxX = Math.max(LIST_MENU_MARGIN, window.innerWidth - LIST_MENU_WIDTH - LIST_MENU_MARGIN);
@@ -1050,15 +1155,7 @@ const toggleMuteFromMenu = () => {
 const removeFromListFromMenu = () => {
     const uid = listMenuFriend.value?.uid;
     if (!uid) return;
-    friends.value = friends.value.filter((item) => item.uid !== uid);
-    removePinned(uid);
-    removeMuted(uid);
-    clearUnread(uid);
-    if (activeFriend.value?.uid === uid) {
-        activeFriend.value = null;
-        messages.value = [];
-        localMessages.value = [];
-    }
+    updateHidden(uid);
     closeListMenu();
 };
 
@@ -1458,6 +1555,12 @@ const handleWsMessage = (payload) => {
     messageIdSet.add(entry.id);
     const activeUid = activeFriend.value?.uid;
     if (entry.senderUid !== auth.value.uid) {
+        if (entry.targetType === 'private' && isBlocked(entry.senderUid)) {
+            return;
+        }
+        if (entry.targetType === 'private') {
+            showInChatList(entry.senderUid);
+        }
         if (!mutedUids.value.includes(entry.senderUid)) {
             playNotifySound();
             flashWindow();
@@ -1564,6 +1667,67 @@ const formatUnread = (count) => {
 };
 const toggleSendMenu = () => {
     showSendMenu.value = !showSendMenu.value;
+};
+
+const toggleMorePanel = () => {
+    showMorePanel.value = !showMorePanel.value;
+};
+
+const toggleRemoteMenu = () => {
+    showRemoteMenu.value = !showRemoteMenu.value;
+};
+
+const closeMorePanel = () => {
+    showMorePanel.value = false;
+};
+
+const toggleActivePinned = () => {
+    const uid = activeFriend.value?.uid;
+    if (!uid) return;
+    updatePinned(uid);
+};
+
+const toggleActiveMuted = () => {
+    const uid = activeFriend.value?.uid;
+    if (!uid) return;
+    updateMuted(uid);
+};
+
+const clearActiveChat = () => {
+    if (!activeFriend.value?.uid) return;
+    messages.value = [];
+    localMessages.value = [];
+    messageIdSet = new Set();
+    lastMessageSignature.value = '';
+};
+
+const handlePanelAction = (type) => {
+    const uid = activeFriend.value?.uid;
+    if (!uid && type !== 'report') return;
+    if (type === 'block') {
+        updateBlocked(uid);
+        if (blockedUids.value.includes(uid)) {
+            blockNotice.value = { uid, text: '你已屏蔽来自该好友的消息' };
+        } else {
+            blockNotice.value = { uid, text: '你已允许接受该好友的消息' };
+        }
+        closeMorePanel();
+        return;
+    }
+    if (type === 'clear') {
+        clearActiveChat();
+        closeMorePanel();
+        return;
+    }
+    const labelMap = {
+        files: '文件传输列表',
+        remove: '删除好友',
+        report: '举报该用户'
+    };
+    if (labelMap[type]) {
+        statusText.value = `${labelMap[type]}功能未接入`;
+    }
+    closeMorePanel();
 };
 
 const emojiTabs = [
@@ -1856,6 +2020,18 @@ const handleDocumentClick = (event) => {
             closeEmojiPicker();
         }
     }
+    if (showRemoteMenu.value) {
+        const remote = event.target?.closest?.('.chat-action-remote');
+        if (!remote) {
+            showRemoteMenu.value = false;
+        }
+    }
+    if (showMorePanel.value) {
+        const panel = morePanelRef.value;
+        if (!panel || !panel.contains(event.target)) {
+            closeMorePanel();
+        }
+    }
     if (
         isFriendProfileVisible.value &&
         friendProfileRef.value &&
@@ -1919,6 +2095,30 @@ const contactInitials = computed(() => {
 const contactSignature = computed(() => {
     return contactProfileSource.value?.signature || '这个人很神秘，暂未填写签名';
 });
+const isActivePinned = computed(() => {
+    const uid = activeFriend.value?.uid;
+    return uid ? isPinned(uid) : false;
+});
+
+const isActiveMuted = computed(() => {
+    const uid = activeFriend.value?.uid;
+    return uid ? isMuted(uid) : false;
+});
+
+const isActiveBlocked = computed(() => {
+    const uid = activeFriend.value?.uid;
+    return uid ? isBlocked(uid) : false;
+});
+
+const blockNoticeText = computed(() => {
+    if (!blockNotice.value?.uid) return '';
+    if (blockNotice.value.uid !== activeFriend.value?.uid) return '';
+    return blockNotice.value.text || '';
+});
+
+const blockActionLabel = computed(() =>
+    isActiveBlocked.value ? '取消屏蔽此人' : '屏蔽此人'
+);
 
 const nicknameCount = computed(() => editForm.value.nickname.length);
 const signatureCount = computed(() => editForm.value.signature.length);
@@ -1953,7 +2153,7 @@ watch(
 const filteredFriends = computed(() => {
     const query = searchText.value.trim().toLowerCase();
     const base = !query
-        ? friends.value
+        ? friends.value.filter((item) => !isHidden(item.uid))
         : friends.value.filter(
               (item) =>
                   item.username?.toLowerCase().includes(query) ||
@@ -2413,6 +2613,14 @@ const loadFriends = async ({ silent } = {}) => {
                 mutedUids.value = mutedUids.value.filter((uid) => knownUids.has(uid));
                 saveUidList('vp_muted_uids', mutedUids.value);
             }
+            if (hiddenUids.value.some((uid) => !knownUids.has(uid))) {
+                hiddenUids.value = hiddenUids.value.filter((uid) => knownUids.has(uid));
+                saveUidList('vp_hidden_uids', hiddenUids.value);
+            }
+            if (blockedUids.value.some((uid) => !knownUids.has(uid))) {
+                blockedUids.value = blockedUids.value.filter((uid) => knownUids.has(uid));
+                saveUidList('vp_blocked_uids', blockedUids.value);
+            }
             if (pendingChatUid.value) {
                 const target = next.find((item) => item.uid === pendingChatUid.value);
                 if (target) {
@@ -2501,6 +2709,7 @@ const clearContactProfile = () => {
 const enterChatFromContact = async () => {
     const target = selectedContact.value;
     if (!target?.uid) return;
+    showInChatList(target.uid);
     activeView.value = 'chat';
     await selectFriend(target);
 };
@@ -3931,8 +4140,9 @@ select:focus {
     align-items: center;
     justify-content: center;
     box-shadow: 0 6px 12px rgba(255, 90, 60, 0.25);
-  
-  }
+
+}
+
 .list-badges {
     display: flex;
     align-items: center;
@@ -4293,6 +4503,86 @@ select:focus {
 
 }
 
+.chat-actions-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-app-region: no-drag;
+}
+
+.chat-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: #374151;
+    transition: background 0.2s, border 0.2s, color 0.2s;
+    -webkit-app-region: no-drag;
+}
+
+.chat-action-btn:hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: #111827;
+}
+
+.chat-action-icon {
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
+}
+
+.chat-action-remote {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    -webkit-app-region: no-drag;
+}
+
+.chat-action-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: -20px;
+    min-width: 180px;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 16px 24px rgba(15, 23, 42, 0.14);
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 6;
+    -webkit-app-region: no-drag;
+}
+
+.chat-action-menu.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.chat-action-menu-item {
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #1f2937;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+}
+
+.chat-action-menu-item:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+
 .chip {
     font-size: 11px;
     font-weight: 600;
@@ -4343,6 +4633,17 @@ select:focus {
     background: linear-gradient(180deg, rgba(243, 248, 255, 0.8), rgba(255, 255, 255, 0.95));
 }
 
+.chat-block-notice {
+    align-self: center;
+    background: #f3f4f6;
+    color: #9ca3af;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    text-align: center;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
 .bubble-list {
     display: flex;
     flex-direction: column;
@@ -4369,9 +4670,9 @@ select:focus {
 
 .bubble.file-only {
     padding: 0;
-    background: unset!important;
+    background: unset !important;
     box-shadow: none;
-    color: inherit!important;
+    color: inherit !important;
 }
 
 .bubble.self {
@@ -4430,7 +4731,7 @@ select:focus {
     background: rgba(30, 30, 30, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
-    box-shadow:  4px 8px 8px 4px rgba(0,0,0,0.15);
+    box-shadow: 4px 8px 8px 4px rgba(0, 0, 0, 0.15);
 }
 
 .bubble.self .bubble-file {
@@ -4471,7 +4772,7 @@ select:focus {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: white!important;
+    color: white !important;
 }
 
 .bubble-file-size,
@@ -4599,6 +4900,149 @@ select:focus {
     background: rgba(37, 99, 235, 0.12);
     border-color: rgba(37, 99, 235, 0.3);
     color: #1d4ed8;
+}
+
+.chat-side-overlay {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 18;
+}
+
+.chat-side-panel {
+    position: fixed;
+    top: 70px;
+    right: 0px;
+    width: 260px;
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+    display: grid;
+    gap: 12px;
+    padding: 8px;
+    opacity: 0;
+    transform: translateX(12px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 19;
+    background-color: #fff;
+}
+
+.chat-side-panel.open {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.chat-side-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.chat-side-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #111827;
+}
+
+.chat-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 40px;
+    height: 22px;
+}
+
+.chat-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.chat-switch-slider {
+    position: absolute;
+    inset: 0;
+    background: #e5e7eb;
+    border-radius: 999px;
+    transition: background 0.2s ease;
+}
+
+.chat-switch-slider::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 2px;
+    top: 2px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+    transition: transform 0.2s ease;
+}
+
+.chat-switch input:checked+.chat-switch-slider {
+    background: #60a5fa;
+}
+
+.chat-switch input:checked+.chat-switch-slider::before {
+    transform: translateX(18px);
+}
+
+.chat-side-action {
+    width: 100%;
+    border: none;
+    background: #ffffff;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.chat-side-action:hover {
+    background: #f3f4f6;
+}
+
+.chat-side-chev {
+    font-family: "Segoe MDL2 Assets";
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.chat-side-danger {
+    width: 100%;
+    border: none;
+    background: #fff5f5;
+    color: #ef4444;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.chat-side-danger:hover {
+    background: #fee2e2;
+}
+
+.chat-side-link {
+    border: none;
+    background: transparent;
+    color: #2563eb;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    padding: 6px 0;
 }
 
 .tool-glyph {
