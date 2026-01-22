@@ -1,1447 +1,1187 @@
 ﻿<template>
-  <div class="app-shell" :class="{ 'app-enter': isReady }">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark">R</div>
-        <div>
-          <div class="brand-title">信聊 · dgitc</div>
-          <div class="brand-sub">即时消息 · 简约工作流</div>
-        </div>
-      </div>
-      <div class="topbar-center">
-        <div class="status-pill">{{ statusText }}</div>
-      </div>
-
-      <div class="topbar-right">
-        <div class="topbar-right-controls">
-          <div class="topbar-right-spacer"></div>
-          <div class="user-card-wrap">
-            <div
-              class="user-card"
-              @mouseenter="showProfile"
-              @mouseleave="scheduleHideProfile"
-            >
-              <div
-                class="user-avatar user-avatar-trigger"
-                @mouseenter="showProfile"
-              >
-                <img v-if="auth.avatar" :src="auth.avatar" alt="avatar" />
-                <span v-else>{{ initials }}</span>
-              </div>
-              <div class="user-meta">
-                <div class="user-name">{{ displayName }}</div>
-                <div class="user-id">UID {{ auth.uid || "---" }}</div>
-              </div>
+    <div class="app-shell" :class="{ 'app-enter': isReady }">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark">R</div>
+                <div>
+                    <div class="brand-title">信聊 · dgitc</div>
+                    <div class="brand-sub">即时消息 · 简约工作流</div>
+                </div>
             </div>
-            <div
-              class="profile-popover"
-              :class="{ 'is-visible': isProfileVisible }"
-              @mouseenter="showProfile"
-              @mouseleave="hideProfile"
-            >
-              <div class="profile-head">
-                <div class="profile-avatar">
-                  <img v-if="auth.avatar" :src="auth.avatar" alt="avatar" />
-                  <span v-else>{{ initials }}</span>
-                </div>
-                <div class="profile-meta">
-                  <div class="profile-name">{{ displayName }}</div>
-                  <div class="profile-uid">
-                    <span>UID {{ auth.uid || "---" }}</span>
-                    <button
-                      class="profile-uid-copy"
-                      type="button"
-                      title="复制"
-                      @click="copyProfileUid(auth.uid)"
-                    >
-                      ⧉
-                    </button>
-                  </div>
-                  <div class="profile-signature">{{ signature }}</div>
-                  <div class="profile-details">
-                    <div class="profile-detail">
-                      性别：{{ auth.gender || "未设置" }}
-                    </div>
-                    <div class="profile-detail">
-                      生日：{{ auth.birthday || "未设置" }}
-                    </div>
-                    <div class="profile-detail">
-                      城市：{{ auth.country || "未设置"
-                      }}{{ auth.province ? ` / ${auth.province}` : ""
-                      }}{{ auth.region ? ` / ${auth.region}` : "" }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="profile-actions">
-                <button
-                  class="profile-btn"
-                  type="button"
-                  @click="openEditProfile"
-                >
-                  编辑资料
-                </button>
-                <button
-                  class="profile-btn ghost"
-                  type="button"
-                  @click="handleLogout"
-                >
-                  退出登录
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="window-controls">
-            <button class="wc-btn" @click="handleMin" title="最小化">
-              <span class="wc-icon">&#xE921;</span>
-            </button>
-            <button class="wc-btn" @click="handleMax" title="最大化">
-              <span class="wc-icon">&#xE922;</span>
-            </button>
-            <button class="wc-btn close" @click="handleClose" title="关闭">
-              <span class="wc-icon">&#xE8BB;</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <main class="layout">
-      <aside class="icon-rail">
-        <div class="rail-section">
-          <button
-            class="rail-btn"
-            :class="{ active: activeView === 'chat' }"
-            title="消息"
-            @click="activeView = 'chat'"
-          >
-            <span class="rail-icon">&#xE8BD;</span>
-            <span v-if="totalUnread" class="rail-badge">{{
-              formatUnread(totalUnread)
-            }}</span>
-          </button>
-          <button
-            class="rail-btn"
-            :class="{ active: activeView === 'contacts' }"
-            title="联系人"
-            @click="openContacts"
-          >
-            <span class="rail-icon">&#xE77B;</span>
-            <span class="rail-dot"></span>
-          </button>
-          <button class="rail-btn" title="收藏">
-            <span class="rail-icon">&#xE734;</span>
-          </button>
-          <button class="rail-btn" title="探索">
-            <span class="rail-icon">&#xE80F;</span>
-            <span class="rail-dot"></span>
-          </button>
-          <button class="rail-btn" title="笔记">
-            <span class="rail-icon">&#xE8A5;</span>
-          </button>
-        </div>
-        <div class="rail-section rail-bottom">
-          <button class="rail-btn" title="邮箱">
-            <span class="rail-icon">&#xE715;</span>
-            <span class="rail-dot"></span>
-          </button>
-          <button class="rail-btn" title="设置">
-            <span class="rail-icon">&#xE713;</span>
-          </button>
-          <button class="rail-btn" title="菜单">
-            <span class="rail-icon">&#xE700;</span>
-          </button>
-        </div>
-      </aside>
-      <aside class="sidebar">
-        <div v-if="activeView === 'chat'" class="chat-sidebar">
-          <div class="search">
-            <div class="serach_input_box">
-              <input
-                v-model="searchText"
-                class="serach_input"
-                type="text"
-                placeholder="搜索联系人或群组"
-              />
-              <div class="add-friend-wrap" ref="addFriendRef">
-                <div class="add_friend_icon" @click.stop="toggleAddMenu">+</div>
-                <div v-if="showAddMenu" class="add-friend-menu" @click.stop>
-                  <button
-                    class="add-friend-item"
-                    type="button"
-                    @click="handleAddAction('friend')"
-                  >
-                    添加好友
-                  </button>
-                  <button
-                    class="add-friend-item"
-                    type="button"
-                    @click="handleAddAction('group')"
-                  >
-                    创建群聊
-                  </button>
-                </div>
-              </div>
+            <div class="topbar-center">
+                <div class="status-pill">{{ statusText }}</div>
             </div>
 
-            <div class="search-hint">好友 {{ filteredFriends.length }}</div>
-          </div>
-          <div class="list">
-            <div class="section-title">私聊列表</div>
-            <button
-              v-for="friend in filteredFriends"
-              :key="friend.uid"
-              class="list-item"
-              :class="{
-                active: activeFriend?.uid === friend.uid,
-                pinned: isPinned(friend.uid),
-              }"
-              @click="selectFriend(friend)"
-              @contextmenu.prevent="openListMenu(friend, $event)"
-            >
-              <div class="avatar">
-                <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
-                <span v-else>{{
-                  friend.username?.slice(0, 2).toUpperCase()
-                }}</span>
-              </div>
-              <div class="list-meta">
-                <div class="list-name">{{ friend.username }}</div>
-                <div class="list-sub">UID {{ friend.uid }}</div>
-              </div>
-              <div class="list-badges">
-                <span v-if="isMuted(friend.uid)" class="list-badge mute"
-                  >免打扰</span
-                >
-                <span
-                  v-if="isUnread(friend.uid)"
-                  class="list-unread-dot"
-                ></span>
-              </div>
-            </button>
-            <div v-if="!filteredFriends.length" class="empty-state">
-              暂无好友，请先添加好友。
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="contacts-sidebar">
-          <div class="contacts-search">
-            <div class="contacts-search-box">
-              <span class="search-icon">&#128269;</span>
-              <input type="text" placeholder="搜索" />
-            </div>
-            <button class="friend-manager-btn" @click="openFoundFriend">
-              <span class="manager-icon">&#xE77B;</span>
-              好友管理器
-            </button>
-          </div>
-          <div class="contacts-section">
-            <button
-              class="contacts-item"
-              :class="{ active: contactsNoticeType === 'friend' }"
-              @click="contactsNoticeType = 'friend'"
-            >
-              <span>好友通知</span>
-              <span class="chev">&#xE76C;</span>
-            </button>
-            <button
-              class="contacts-item"
-              :class="{ active: contactsNoticeType === 'group' }"
-              @click="contactsNoticeType = 'group'"
-            >
-              <span>群通知</span>
-              <span class="badge">2</span>
-              <span class="chev">&#xE76C;</span>
-            </button>
-          </div>
-          <div class="contacts-tabs">
-            <button class="contacts-tab active">好友</button>
-            <button class="contacts-tab">群聊</button>
-          </div>
-          <div class="contacts-list">
-            <div
-              v-for="group in contactGroups"
-              :key="group.key"
-              class="contacts-group"
-            >
-              <button
-                class="contacts-row contacts-group-header"
-                type="button"
-                @click="toggleContactGroup(group.key)"
-              >
-                <span class="contacts-group-title">{{ group.label }}</span>
-                <span class="contacts-group-meta">
-                  <span class="count">{{ groupCountText(group) }}</span>
-                  <span
-                    class="chev"
-                    :class="{ open: isContactGroupOpen(group.key) }"
-                    >&#xE76C;</span
-                  >
-                </span>
-              </button>
-              <div
-                v-show="isContactGroupOpen(group.key)"
-                class="contacts-group-items"
-              >
-                <button
-                  v-for="friend in group.items"
-                  :key="friend.uid"
-                  class="contacts-friend"
-                  type="button"
-                  @click="openContactProfile(friend)"
-                >
-                  <span class="contacts-friend-avatar">
-                    <img
-                      v-if="friend.avatar"
-                      :src="friend.avatar"
-                      alt="avatar"
-                    />
-                    <span v-else>{{
-                      friend.username?.slice(0, 2).toUpperCase()
-                    }}</span>
-                  </span>
-                  <span class="contacts-friend-name">{{
-                    friend.username
-                  }}</span>
-                  <span class="contacts-friend-uid">UID {{ friend.uid }}</span>
-                </button>
-                <div v-if="!group.items.length" class="contacts-empty">
-                  暂无成员
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <section class="chat">
-        <template v-if="activeView === 'chat'">
-          <div class="chat-panel">
-            <div class="chat-header">
-              <div>
-                <div
-                  class="chat-title"
-                  :class="{ clickable: activeFriend }"
-                  @click.stop="toggleFriendProfile"
-                >
-                  {{ activeFriend?.username || "选择一个联系人" }}
-                </div>
-                <div class="chat-sub">
-                  {{
-                    activeFriend
-                      ? `私聊 · UID ${activeFriend.uid}`
-                      : "等待选择聊天对象"
-                  }}
-                </div>
-              </div>
-              <div class="chat-actions">
-                <div class="chat-actions-left">
-                  <button
-                    class="chat-action-btn"
-                    type="button"
-                    title="语音通话"
-                    @click="startVoiceCall"
-                  >
-                    <span class="chat-action-icon">&#xE717;</span>
-                  </button>
-                  <button
-                    class="chat-action-btn"
-                    type="button"
-                    title="视频通话"
-                  >
-                    <span class="chat-action-icon">&#xE714;</span>
-                  </button>
-                  <button
-                    class="chat-action-btn"
-                    type="button"
-                    title="屏幕分享"
-                  >
-                    <span class="chat-action-icon">&#xE7F4;</span>
-                  </button>
-                  <div class="chat-action-remote" title="远程控制">
-                    <button
-                      class="chat-action-btn"
-                      type="button"
-                      @click.stop="toggleRemoteMenu"
-                    >
-                      <span class="chat-action-icon">&#xE8A7;</span>
-                    </button>
-                    <div
-                      class="chat-action-menu"
-                      :class="{ open: showRemoteMenu }"
-                    >
-                      <button class="chat-action-menu-item" type="button">
-                        远程控制对方电脑
-                      </button>
-                      <button class="chat-action-menu-item" type="button">
-                        邀请对方远程协助
-                      </button>
-                    </div>
-                  </div>
-                  <button
-                    class="chat-action-btn"
-                    type="button"
-                    title="发起群聊"
-                  >
-                    <span class="chat-action-icon">&#xE902;</span>
-                  </button>
-                </div>
-                <span class="chip">私聊</span>
-                <span class="chip" :class="{ offline: !activeFriendOnline }">
-                  {{ activeFriendOnline ? "在线" : "离线" }}
-                </span>
-              </div>
-              <div
-                v-if="activeFriend"
-                ref="friendProfileRef"
-                class="friend-profile-popover"
-                :class="{ 'is-visible': isFriendProfileVisible }"
-                @click.stop
-              >
-                <div class="profile-head">
-                  <div class="profile-avatar">
-                    <img
-                      v-if="friendProfileSource?.avatar"
-                      :src="friendProfileSource?.avatar"
-                      alt="avatar"
-                    />
-                    <span v-else>{{ friendInitials }}</span>
-                  </div>
-                  <div class="profile-meta">
-                    <div class="profile-name">{{ friendDisplayName }}</div>
-                    <div class="profile-uid">
-                      <span>UID {{ friendProfileSource?.uid || "---" }}</span>
-                      <button
-                        class="profile-uid-copy"
-                        type="button"
-                        title="复制"
-                        @click="copyProfileUid(friendProfileSource?.uid)"
-                      >
-                        ⧉
-                      </button>
-                    </div>
-                    <div class="profile-signature">{{ friendSignature }}</div>
-                    <div class="profile-details">
-                      <div class="profile-detail">
-                        性别：{{ friendProfileSource?.gender || "未设置" }}
-                      </div>
-                      <div class="profile-detail">
-                        生日：{{ friendProfileSource?.birthday || "未设置" }}
-                      </div>
-                      <div class="profile-detail">
-                        城市：{{ friendProfileSource?.country || "未设置"
-                        }}{{
-                          friendProfileSource?.province
-                            ? ` / ${friendProfileSource?.province}`
-                            : ""
-                        }}{{
-                          friendProfileSource?.region
-                            ? ` /
-                                                ${friendProfileSource?.region}`
-                            : ""
-                        }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="chat-body" ref="chatBodyRef" @scroll="handleChatScroll">
-              <div v-if="loading" class="loading">加载中...</div>
-              <div v-else-if="!messages.length" class="empty-chat">
-                还没有聊天记录，打个招呼吧。
-              </div>
-              <div v-else class="bubble-list">
-                <div
-                  v-for="msg in displayMessages"
-                  :key="msg.id"
-                  class="bubble"
-                  :class="{
-                    self: msg.senderUid === auth.uid,
-                    error: msg.error,
-                    'image-only': isImageOnlyMessage(msg),
-                    'file-only': msg.type === 'file',
-                  }"
-                >
-                  <span v-if="msg.error" class="bubble-error-dot"></span>
-                  <div class="bubble-name">
-                    {{
-                      msg.senderUid === auth.uid
-                        ? displayName
-                        : activeFriend?.username
-                    }}
-                  </div>
-                  <div class="bubble-text">
-                    <template v-if="msg.type === 'image'">
-                      <div class="bubble-image-grid">
-                        <img
-                          v-for="(url, index) in getMessageImageUrls(msg)"
-                          :key="`${msg.id || 'img'}-${index}`"
-                          class="bubble-image"
-                          :src="url"
-                          alt="image"
-                          @dblclick.stop="openImagePreview(url)"
-                        />
-                      </div>
-                      <div
-                        v-if="getMessageImageCaption(msg)"
-                        class="bubble-caption"
-                      >
-                        {{ getMessageImageCaption(msg) }}
-                      </div>
-                    </template>
-                    <template v-else-if="msg.type === 'file'">
-                      <div class="bubble-file">
-                        <div class="bubble-file-icon">&#xE8A5;</div>
-                        <div class="bubble-file-meta">
-                          <div class="bubble-file-name">
-                            {{ getMessageFileName(msg) }}
-                          </div>
-                          <div class="bubble-file-size">
-                            {{ formatBytes(getMessageFileSize(msg)) }}
-                          </div>
-                        </div>
-                        <button
-                          v-if="getMessageFileUrl(msg) && !isFileExpired(msg)"
-                          class="bubble-file-link"
-                          type="button"
-                          @click="downloadFileMessage(msg)"
-                        >
-                          {{ hasDownloadedFile(msg) ? "打开" : "下载" }}
-                        </button>
-                        <span
-                          v-else-if="isFileExpired(msg)"
-                          class="bubble-file-expired"
-                        >
-                          已过期
-                        </span>
-                        <span v-else class="bubble-file-status">上传中</span>
-                      </div>
-                    </template>
-                    <template v-else-if="msg.type === 'card'">
-                      <div class="card-message">
-                        <div class="card-title">个人名片</div>
-                        <div class="card-main">
-                          <div class="card-avatar">
-                            <img
-                              v-if="getCardAvatar(msg)"
-                              :src="getCardAvatar(msg)"
-                              alt="avatar"
-                            />
-                            <span v-else>{{ getCardInitials(msg) }}</span>
-                          </div>
-                          <div class="card-meta">
-                            <div class="card-name">{{ getCardName(msg) }}</div>
-                            <div class="card-uid">
-                              UID {{ getCardUid(msg) }}
+            <div class="topbar-right">
+                <div class="topbar-right-controls">
+                    <div class="topbar-right-spacer"></div>
+                    <div class="user-card-wrap">
+                        <div class="user-card" @mouseenter="showProfile" @mouseleave="scheduleHideProfile">
+                            <div class="user-avatar user-avatar-trigger" @mouseenter="showProfile">
+                                <img v-if="auth.avatar" :src="auth.avatar" alt="avatar" />
+                                <span v-else>{{ initials }}</span>
                             </div>
-                          </div>
+                            <div class="user-meta">
+                                <div class="user-name">{{ displayName }}</div>
+                                <div class="user-id">UID {{ auth.uid || "---" }}</div>
+                            </div>
                         </div>
-                        <div v-if="getCardNote(msg)" class="card-note">
-                          {{ getCardNote(msg) }}
+                        <div class="profile-popover" :class="{ 'is-visible': isProfileVisible }"
+                            @mouseenter="showProfile" @mouseleave="hideProfile">
+                            <div class="profile-head">
+                                <div class="profile-avatar">
+                                    <img v-if="auth.avatar" :src="auth.avatar" alt="avatar" />
+                                    <span v-else>{{ initials }}</span>
+                                </div>
+                                <div class="profile-meta">
+                                    <div class="profile-name">{{ displayName }}</div>
+                                    <div class="profile-uid">
+                                        <span>UID {{ auth.uid || "---" }}</span>
+                                        <button class="profile-uid-copy" type="button" title="复制"
+                                            @click="copyProfileUid(auth.uid)">
+                                            ⧉
+                                        </button>
+                                    </div>
+                                    <div class="profile-signature">{{ signature }}</div>
+                                    <div class="profile-details">
+                                        <div class="profile-detail">
+                                            性别：{{ auth.gender || "未设置" }}
+                                        </div>
+                                        <div class="profile-detail">
+                                            生日：{{ auth.birthday || "未设置" }}
+                                        </div>
+                                        <div class="profile-detail">
+                                            城市：{{ auth.country || "未设置"
+                                            }}{{ auth.province ? ` / ${auth.province}` : ""
+                                            }}{{ auth.region ? ` / ${auth.region}` : "" }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="profile-actions">
+                                <button class="profile-btn" type="button" @click="openEditProfile">
+                                    编辑资料
+                                </button>
+                                <button class="profile-btn ghost" type="button" @click="handleLogout">
+                                    退出登录
+                                </button>
+                            </div>
                         </div>
-                      </div>
-                    </template>
-                    <span v-else>{{ renderMessage(msg) }}</span>
-                  </div>
-                  <div class="bubble-time">
-                    {{ formatTime(msg.createdAt) }}
-                  </div>
-                  <span
-                    v-if="msg.pending"
-                    class="bubble-pending-spinner"
-                  ></span>
-                </div>
-                <div v-if="blockNoticeText" class="chat-block-notice">
-                  {{ blockNoticeText }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="composer" :style="{ height: `${composerHeight}px` }">
-            <div
-              class="composer-resize-handle"
-              @mousedown.prevent="startComposerResize"
-            ></div>
-            <div class="composer-toolbar">
-              <button
-                ref="emojiButtonRef"
-                class="tool-icon-btn"
-                :class="{ 'is-active': showEmojiPicker }"
-                title="表情"
-                @click.stop="toggleEmojiPicker"
-              >
-                <span class="tool-glyph">&#xE170;</span>
-              </button>
-              <teleport to="body">
-                <div
-                  v-if="showEmojiPicker"
-                  ref="emojiPickerRef"
-                  class="emoji-panel"
-                  :style="emojiPanelStyle"
-                  @click.stop
-                >
-                  <div class="emoji-tabs">
-                    <button
-                      v-for="tab in emojiTabs"
-                      :key="tab.id"
-                      class="emoji-tab"
-                      :class="{ active: emojiTab === tab.id }"
-                      type="button"
-                      @click="emojiTab = tab.id"
-                    >
-                      {{ tab.label }}
-                    </button>
-                  </div>
-                  <div v-if="currentEmojiList.length" class="emoji-grid">
-                    <button
-                      v-for="item in currentEmojiList"
-                      :key="`${emojiTab}-${item}`"
-                      class="emoji-btn"
-                      type="button"
-                      @click="addEmoji(item)"
-                    >
-                      {{ item }}
-                    </button>
-                  </div>
-                  <div v-else class="emoji-empty">暂无表情</div>
-                </div>
-              </teleport>
-              <button class="tool-icon-btn" title="剪刀">
-                <span class="tool-glyph">&#xE8C6;</span>
-              </button>
-              <button
-                class="tool-icon-btn"
-                title="文件"
-                @click="triggerFileSelect"
-              >
-                <span class="tool-glyph">&#xE8A5;</span>
-              </button>
-              <input
-                ref="fileInputRef"
-                class="composer-file-input"
-                type="file"
-                @change="handleFileSelect"
-              />
-              <input
-                ref="imageInputRef"
-                class="composer-image-input"
-                type="file"
-                accept="image/*"
-                multiple
-                @change="handleImageSelect"
-              />
-              <button
-                class="tool-icon-btn"
-                title="图片"
-                @click="triggerImageSelect"
-              >
-                <span class="tool-glyph">&#xEB9F;</span>
-              </button>
-              <button
-                class="tool-icon-btn"
-                title="语音"
-                @click="startVoiceCall"
-              >
-                <span class="tool-glyph">&#xE720;</span>
-              </button>
-              <div class="tool-spacer"></div>
-              <button
-                class="tool-icon-btn"
-                title="更多"
-                :class="{ 'is-active': showMorePanel }"
-                @click.stop="toggleMorePanel"
-              >
-                <span class="tool-glyph">&#xE712;</span>
-              </button>
-            </div>
-            <div class="composer-body">
-              <div class="composer-input">
-                <div v-if="draftImages.length" class="composer-image-list">
-                  <div
-                    v-for="(item, index) in draftImages"
-                    :key="item.id || `${item.hash}-${index}`"
-                    class="composer-image-preview"
-                  >
-                    <img :src="item.preview" alt="preview" />
-                  </div>
-                </div>
-                <textarea
-                  v-model="draft"
-                  ref="composerTextareaRef"
-                  placeholder=""
-                  @keydown.enter.exact.prevent="handleComposerEnter"
-                  @keydown.enter.shift.stop
-                  @keydown.backspace="handleComposerBackspace"
-                  @compositionstart="isComposing = true"
-                  @compositionend="isComposing = false"
-                  @paste="handleComposerPaste"
-                ></textarea>
-              </div>
-            </div>
-            <div class="composer-actions">
-              <div class="send-group">
-                <button
-                  class="send-btn"
-                  :disabled="!canSend"
-                  @click="sendMessage"
-                >
-                  发送
-                </button>
-                <button
-                  class="send-drop"
-                  title="发送选项"
-                  @click.stop="toggleSendMenu"
-                >
-                  <span class="tool-glyph">&#xE70D;</span>
-                </button>
-                <div v-if="showSendMenu" class="send-menu">
-                  <div class="send-menu-item">
-                    <span class="send-tip-mark">&#xE73E;</span>
-                    <span>按 Enter 键发送消息</span>
-                  </div>
-                  <div class="send-menu-item">
-                    <span class="send-tip-mark">&#xE73E;</span>
-                    <span>按 Ctrl + Enter 键发送消息</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div
-            v-if="showMorePanel"
-            class="chat-side-overlay"
-            @click="closeMorePanel"
-          ></div>
-          <aside
-            ref="morePanelRef"
-            class="chat-side-panel"
-            :class="{ open: showMorePanel }"
-            @click.stop
-          >
-            <div class="chat-side-card">
-              <div class="chat-side-row">
-                <span>设为置顶</span>
-                <label class="chat-switch">
-                  <input
-                    type="checkbox"
-                    :checked="isActivePinned"
-                    @change="toggleActivePinned"
-                  />
-                  <span class="chat-switch-slider"></span>
-                </label>
-              </div>
-              <div class="chat-side-row">
-                <span>消息免打扰</span>
-                <label class="chat-switch">
-                  <input
-                    type="checkbox"
-                    :checked="isActiveMuted"
-                    @change="toggleActiveMuted"
-                  />
-                  <span class="chat-switch-slider"></span>
-                </label>
-              </div>
-            </div>
-            <div class="chat-side-card">
-              <button
-                class="chat-side-action"
-                type="button"
-                @click="handlePanelAction('block')"
-              >
-                {{ blockActionLabel }}
-              </button>
-              <button
-                class="chat-side-action"
-                type="button"
-                @click="handlePanelAction('files')"
-              >
-                文件传输列表
-                <span class="chat-side-chev">&#xE76C;</span>
-              </button>
-              <button
-                class="chat-side-action"
-                type="button"
-                @click="handlePanelAction('clear')"
-              >
-                删除聊天记录
-              </button>
-            </div>
-            <div class="chat-side-card">
-              <button
-                class="chat-side-danger"
-                type="button"
-                @click="handlePanelAction('remove')"
-              >
-                删除好友
-              </button>
-            </div>
-            <button
-              class="chat-side-link"
-              type="button"
-              @click="handlePanelAction('report')"
-            >
-              被骚扰了？举报该用户
-            </button>
-          </aside>
-        </template>
-
-        <div v-else class="contacts-panel">
-          <div class="contacts-header">
-            <div class="contacts-title">{{ contactsPanelTitle }}</div>
-            <div class="contacts-tools">
-              <button
-                v-if="selectedContact"
-                class="tool-btn"
-                title="返回"
-                @click="clearContactProfile"
-              >
-                <span class="tool-icon">&#xE72B;</span>
-              </button>
-              <template v-else>
-                <button class="tool-btn" title="筛选">
-                  <span class="tool-icon">&#xE71C;</span>
-                  <span class="tool-dot"></span>
-                </button>
-                <button class="tool-btn" title="清空">
-                  <span class="tool-icon">&#xE74D;</span>
-                </button>
-              </template>
-            </div>
-          </div>
-          <div class="contacts-body">
-            <div v-if="selectedContact" class="contact-profile">
-              <div v-if="contactProfileLoading" class="loading">加载中...</div>
-              <div v-else class="contact-profile-card">
-                <div class="profile-head">
-                  <div class="profile-avatar">
-                    <img
-                      v-if="contactProfileSource?.avatar"
-                      :src="contactProfileSource?.avatar"
-                      alt="avatar"
-                    />
-                    <span v-else>{{ contactInitials }}</span>
-                  </div>
-                  <div class="profile-meta">
-                    <div class="profile-name">{{ contactDisplayName }}</div>
-                    <div class="profile-uid">
-                      <span>UID {{ contactProfileSource?.uid || "---" }}</span>
-                      <button
-                        class="profile-uid-copy"
-                        type="button"
-                        title="复制"
-                        @click="copyProfileUid(contactProfileSource?.uid)"
-                      >
-                        ⧉
-                      </button>
                     </div>
-                    <div class="profile-signature">{{ contactSignature }}</div>
-                    <div class="profile-details">
-                      <div class="profile-detail">
-                        性别：{{ contactProfileSource?.gender || "未设置" }}
-                      </div>
-                      <div class="profile-detail">
-                        生日：{{ contactProfileSource?.birthday || "未设置" }}
-                      </div>
-                      <div class="profile-detail">
-                        城市：{{ contactProfileSource?.country || "未设置"
-                        }}{{
-                          contactProfileSource?.province
-                            ? ` / ${contactProfileSource?.province}`
-                            : ""
-                        }}{{
-                          contactProfileSource?.region
-                            ? ` /
+                    <div class="window-controls">
+                        <button class="wc-btn" @click="handleMin" title="最小化">
+                            <span class="wc-icon">&#xE921;</span>
+                        </button>
+                        <button class="wc-btn" @click="handleMax" title="最大化">
+                            <span class="wc-icon">&#xE922;</span>
+                        </button>
+                        <button class="wc-btn close" @click="handleClose" title="关闭">
+                            <span class="wc-icon">&#xE8BB;</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="layout">
+            <aside class="icon-rail">
+                <div class="rail-section">
+                    <button class="rail-btn" :class="{ active: activeView === 'chat' }" title="消息"
+                        @click="activeView = 'chat'">
+                        <span class="rail-icon">&#xE8BD;</span>
+                        <span v-if="totalUnread" class="rail-badge">{{
+                            formatUnread(totalUnread)
+                        }}</span>
+                    </button>
+                    <button class="rail-btn" :class="{ active: activeView === 'contacts' }" title="联系人"
+                        @click="openContacts">
+                        <span class="rail-icon">&#xE77B;</span>
+                        <span class="rail-dot"></span>
+                    </button>
+                    <button class="rail-btn" title="收藏">
+                        <span class="rail-icon">&#xE734;</span>
+                    </button>
+                    <button class="rail-btn" title="探索">
+                        <span class="rail-icon">&#xE80F;</span>
+                        <span class="rail-dot"></span>
+                    </button>
+                    <button class="rail-btn" title="笔记">
+                        <span class="rail-icon">&#xE8A5;</span>
+                    </button>
+                </div>
+                <div class="rail-section rail-bottom">
+                    <button class="rail-btn" title="邮箱">
+                        <span class="rail-icon">&#xE715;</span>
+                        <span class="rail-dot"></span>
+                    </button>
+                    <button class="rail-btn" title="设置">
+                        <span class="rail-icon">&#xE713;</span>
+                    </button>
+                    <button class="rail-btn" title="菜单">
+                        <span class="rail-icon">&#xE700;</span>
+                    </button>
+                </div>
+            </aside>
+            <aside class="sidebar">
+                <div v-if="activeView === 'chat'" class="chat-sidebar">
+                    <div class="search">
+                        <div class="serach_input_box">
+                            <input v-model="searchText" class="serach_input" type="text" placeholder="搜索联系人或群组" />
+                            <div class="add-friend-wrap" ref="addFriendRef">
+                                <div class="add_friend_icon" @click.stop="toggleAddMenu">+</div>
+                                <div v-if="showAddMenu" class="add-friend-menu" @click.stop>
+                                    <button class="add-friend-item" type="button" @click="handleAddAction('friend')">
+                                        添加好友
+                                    </button>
+                                    <button class="add-friend-item" type="button" @click="handleAddAction('group')">
+                                        创建群聊
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="search-hint">
+                            好友 {{ filteredFriends.length }} · 群聊 {{ filteredGroups.length }}
+                        </div>
+                    </div>
+                    <div class="list">
+                        <div class="section-title">私聊列表</div>
+                        <button v-for="friend in filteredFriends" :key="friend.uid" class="list-item" :class="{
+                            active: activeFriend?.uid === friend.uid,
+                            pinned: isPinned(friend.uid),
+                        }" @click="selectFriend(friend)" @contextmenu.prevent="openListMenu(friend, $event)">
+                            <div class="avatar">
+                                <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                <span v-else>{{
+                                    friend.username?.slice(0, 2).toUpperCase()
+                                }}</span>
+                            </div>
+                            <div class="list-meta">
+                                <div class="list-name">{{ friend.username }}</div>
+                                <div class="list-sub">UID {{ friend.uid }}</div>
+                            </div>
+                            <div class="list-badges">
+                                <span v-if="isMuted(friend.uid)" class="list-badge mute">免打扰</span>
+                                <span v-if="isUnread(friend.uid)" class="list-unread-dot"></span>
+                            </div>
+                        </button>
+                        <div v-if="!filteredFriends.length" class="empty-state">
+                            暂无好友，请先添加好友。
+                        </div>
+                        <div class="section-title">群聊列表</div>
+                        <button v-for="group in filteredGroups" :key="group.id" class="list-item group-item"
+                            :class="{ active: activeGroup?.id === group.id }" @click="selectGroup(group)">
+                            <div class="avatar group-avatar">
+                                <span>{{ getGroupInitials(group) }}</span>
+                            </div>
+                            <div class="list-meta">
+                                <div class="list-name">{{ group.name }}</div>
+                                <div class="list-sub">群聊 · {{ group.members.length }} 人</div>
+                            </div>
+                            <div class="list-badges">
+                                <span v-if="group.announcement" class="list-badge">公告</span>
+                            </div>
+                        </button>
+                        <div v-if="!filteredGroups.length" class="empty-state">
+                            暂无群聊，请先创建群聊。
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="contacts-sidebar">
+                    <div class="contacts-search">
+                        <div class="contacts-search-box">
+                            <span class="search-icon">&#128269;</span>
+                            <input type="text" placeholder="搜索" />
+                        </div>
+                        <button class="friend-manager-btn" @click="openFoundFriend">
+                            <span class="manager-icon">&#xE77B;</span>
+                            好友管理器
+                        </button>
+                    </div>
+                    <div class="contacts-section">
+                        <button class="contacts-item" :class="{ active: contactsNoticeType === 'friend' }"
+                            @click="contactsNoticeType = 'friend'">
+                            <span>好友通知</span>
+                            <span class="chev">&#xE76C;</span>
+                        </button>
+                        <button class="contacts-item" :class="{ active: contactsNoticeType === 'group' }"
+                            @click="contactsNoticeType = 'group'">
+                            <span>群通知</span>
+                            <span class="badge">2</span>
+                            <span class="chev">&#xE76C;</span>
+                        </button>
+                    </div>
+                    <div class="contacts-tabs">
+                        <button class="contacts-tab active">好友</button>
+                        <button class="contacts-tab">群聊</button>
+                    </div>
+                    <div class="contacts-list">
+                        <div v-for="group in contactGroups" :key="group.key" class="contacts-group">
+                            <button class="contacts-row contacts-group-header" type="button"
+                                @click="toggleContactGroup(group.key)">
+                                <span class="contacts-group-title">{{ group.label }}</span>
+                                <span class="contacts-group-meta">
+                                    <span class="count">{{ groupCountText(group) }}</span>
+                                    <span class="chev" :class="{ open: isContactGroupOpen(group.key) }">&#xE76C;</span>
+                                </span>
+                            </button>
+                            <div v-show="isContactGroupOpen(group.key)" class="contacts-group-items">
+                                <button v-for="friend in group.items" :key="friend.uid" class="contacts-friend"
+                                    type="button" @click="openContactProfile(friend)">
+                                    <span class="contacts-friend-avatar">
+                                        <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                        <span v-else>{{
+                                            friend.username?.slice(0, 2).toUpperCase()
+                                        }}</span>
+                                    </span>
+                                    <span class="contacts-friend-name">{{
+                                        friend.username
+                                    }}</span>
+                                    <span class="contacts-friend-uid">UID {{ friend.uid }}</span>
+                                </button>
+                                <div v-if="!group.items.length" class="contacts-empty">
+                                    暂无成员
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="chat">
+                <template v-if="activeView === 'chat'">
+                    <div class="chat-shell" :class="{ 'with-group': isGroupActive }">
+                        <div class="chat-stack">
+                            <div class="chat-panel">
+                                <div class="chat-header" :class="{ 'is-group': isGroupActive }">
+                                    <div>
+                                        <div v-if="isGroupActive" class="chat-title group-title">
+                                            <input v-if="isEditingGroupName" ref="groupNameInputRef"
+                                                v-model="groupNameDraft" class="group-title-input" type="text"
+                                                maxlength="40" @keydown.enter.prevent="commitGroupName"
+                                                @keydown.esc.stop.prevent="cancelGroupNameEdit"
+                                                @blur="commitGroupName" />
+                                            <span v-else class="group-title-text" @click="startEditGroupName">
+                                                {{ activeGroup?.name || "群聊" }}
+                                            </span>
+                                        </div>
+                                        <div v-else class="chat-title" :class="{ clickable: activeFriend }"
+                                            @click.stop="toggleFriendProfile">
+                                            {{ activeFriend?.username || "选择一个联系人" }}
+                                        </div>
+                                        <div class="chat-sub">
+                                            <template v-if="isGroupActive">
+                                                群聊 · {{ groupMemberCount }} 人
+                                            </template>
+                                            <template v-else>
+                                                {{
+                                                    activeFriend
+                                                        ? `私聊 · UID ${activeFriend.uid}`
+                                                        : "等待选择聊天对象"
+                                                }}
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div class="chat-actions">
+                                        <div v-if="isGroupActive" class="chat-actions-left">
+                                            <button class="chat-action-btn" type="button" title="语音通话"
+                                                @click="startVoiceCall">
+                                                <span class="chat-action-icon">&#xE717;</span>
+                                            </button>
+                                            <button class="chat-action-btn" type="button" title="视频通话"
+                                                @click="handleGroupAction('video')">
+                                                <span class="chat-action-icon">&#xE714;</span>
+                                            </button>
+                                            <button class="chat-action-btn" type="button" title="屏幕分享"
+                                                @click="handleGroupAction('screen')">
+                                                <span class="chat-action-icon">&#xE7F4;</span>
+                                            </button>
+                                            <button class="chat-action-btn" type="button" title="邀请加群"
+                                                @click="handleGroupAction('invite')">
+                                                <span class="chat-action-icon">&#xE902;</span>
+                                            </button>
+                                            <button class="chat-action-btn" type="button" title="更多"
+                                                @click="handleGroupAction('more')">
+                                                <span class="chat-action-icon">&#xE712;</span>
+                                            </button>
+                                        </div>
+                                        <div v-else class="chat-actions-left">
+                                            <button class="chat-action-btn" type="button" title="语音通话"
+                                                @click="startVoiceCall">
+                                                <span class="chat-action-icon">&#xE717;</span>
+                                            </button>
+                                            <button class="chat-action-btn" type="button" title="视频通话">
+                                                <span class="chat-action-icon">&#xE714;</span>
+                                            </button>
+                                            <button class="chat-action-btn" type="button" title="屏幕分享">
+                                                <span class="chat-action-icon">&#xE7F4;</span>
+                                            </button>
+                                            <div class="chat-action-remote" title="远程控制">
+                                                <button class="chat-action-btn" type="button"
+                                                    @click.stop="toggleRemoteMenu">
+                                                    <span class="chat-action-icon">&#xE8A7;</span>
+                                                </button>
+                                                <div class="chat-action-menu" :class="{ open: showRemoteMenu }">
+                                                    <button class="chat-action-menu-item" type="button">
+                                                        远程控制对方电脑
+                                                    </button>
+                                                    <button class="chat-action-menu-item" type="button">
+                                                        邀请对方远程协助
+                                                    </button>
+                                                </div>
+                                            </div>
+                                    <button class="chat-action-btn" type="button" title="发起群聊"
+                                        @click="openChatGroupModal">
+                                        <span class="chat-action-icon">&#xE902;</span>
+                                    </button>
+                                        </div>
+                                        <template v-if="isGroupActive">
+                                            <span class="chip">群聊</span>
+                                        </template>
+                                        <template v-else>
+                                            <span class="chip">私聊</span>
+                                            <span class="chip" :class="{ offline: !activeFriendOnline }">
+                                                {{ activeFriendOnline ? "在线" : "离线" }}
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <div v-if="activeFriend && !isGroupActive" ref="friendProfileRef"
+                                        class="friend-profile-popover" :class="{ 'is-visible': isFriendProfileVisible }"
+                                        @click.stop>
+                                        <div class="profile-head">
+                                            <div class="profile-avatar">
+                                                <img v-if="friendProfileSource?.avatar"
+                                                    :src="friendProfileSource?.avatar" alt="avatar" />
+                                                <span v-else>{{ friendInitials }}</span>
+                                            </div>
+                                            <div class="profile-meta">
+                                                <div class="profile-name">{{ friendDisplayName }}</div>
+                                                <div class="profile-uid">
+                                                    <span>UID {{ friendProfileSource?.uid || "---" }}</span>
+                                                    <button class="profile-uid-copy" type="button" title="复制"
+                                                        @click="copyProfileUid(friendProfileSource?.uid)">
+                                                        ⧉
+                                                    </button>
+                                                </div>
+                                                <div class="profile-signature">{{ friendSignature }}</div>
+                                                <div class="profile-details">
+                                                    <div class="profile-detail">
+                                                        性别：{{ friendProfileSource?.gender || "未设置" }}
+                                                    </div>
+                                                    <div class="profile-detail">
+                                                        生日：{{ friendProfileSource?.birthday || "未设置" }}
+                                                    </div>
+                                                    <div class="profile-detail">
+                                                        城市：{{ friendProfileSource?.country || "未设置"
+                                                        }}{{
+                                                            friendProfileSource?.province
+                                                                ? ` / ${friendProfileSource?.province}`
+                                                                : ""
+                                                        }}{{
+                                                            friendProfileSource?.region
+                                                                ? ` / ${friendProfileSource?.region}`
+                                                                : ""
+                                                        }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                        <div class="chat-body" :class="{ 'group-chat-body': isGroupActive }" ref="chatBodyRef"
+                            @scroll="handleChatScroll">
+                            <div v-if="loading" class="loading">加载中...</div>
+                            <div v-else-if="!displayMessages.length" class="empty-chat">
+                                还没有聊天记录，打个招呼吧。
+                            </div>
+                            <div v-else class="bubble-list">
+                                <div v-for="msg in displayMessages" :key="msg.id" class="bubble" :class="{
+                                    self: msg.senderUid === auth.uid,
+                                    error: msg.error,
+                                    'image-only': isImageOnlyMessage(msg),
+                                    'file-only': msg.type === 'file',
+                                }">
+                                    <span v-if="msg.error" class="bubble-error-dot"></span>
+                                    <div class="bubble-name">{{ getMessageSenderName(msg) }}</div>
+                                    <div class="bubble-text">
+                                        <template v-if="msg.type === 'image'">
+                                            <div class="bubble-image-grid">
+                                                <img v-for="(url, index) in getMessageImageUrls(msg)"
+                                                    :key="`${msg.id || 'img'}-${index}`" class="bubble-image" :src="url"
+                                                    alt="image" @dblclick.stop="openImagePreview(url)" />
+                                            </div>
+                                            <div v-if="getMessageImageCaption(msg)" class="bubble-caption">
+                                                {{ getMessageImageCaption(msg) }}
+                                            </div>
+                                        </template>
+                                        <template v-else-if="msg.type === 'file'">
+                                            <div class="bubble-file">
+                                                <div class="bubble-file-icon">&#xE8A5;</div>
+                                                <div class="bubble-file-meta">
+                                                    <div class="bubble-file-name">
+                                                        {{ getMessageFileName(msg) }}
+                                                    </div>
+                                                    <div class="bubble-file-size">
+                                                        {{ formatBytes(getMessageFileSize(msg)) }}
+                                                    </div>
+                                                </div>
+                                                <button v-if="getMessageFileUrl(msg) && !isFileExpired(msg)"
+                                                    class="bubble-file-link" type="button"
+                                                    @click="downloadFileMessage(msg)">
+                                                    {{ hasDownloadedFile(msg) ? "打开" : "下载" }}
+                                                </button>
+                                                <span v-else-if="isFileExpired(msg)" class="bubble-file-expired">
+                                                    已过期
+                                                </span>
+                                                <span v-else class="bubble-file-status">上传中</span>
+                                            </div>
+                                        </template>
+                                        <template v-else-if="msg.type === 'card'">
+                                            <div class="card-message">
+                                                <div class="card-title">个人名片</div>
+                                                <div class="card-main">
+                                                    <div class="card-avatar">
+                                                        <img v-if="getCardAvatar(msg)" :src="getCardAvatar(msg)"
+                                                            alt="avatar" />
+                                                        <span v-else>{{ getCardInitials(msg) }}</span>
+                                                    </div>
+                                                    <div class="card-meta">
+                                                        <div class="card-name">{{ getCardName(msg) }}</div>
+                                                        <div class="card-uid">
+                                                            UID {{ getCardUid(msg) }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div v-if="getCardNote(msg)" class="card-note">
+                                                    {{ getCardNote(msg) }}
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <span v-else>{{ renderMessage(msg) }}</span>
+                                    </div>
+                                    <div class="bubble-time">
+                                        {{ formatTime(msg.createdAt) }}
+                                    </div>
+                                    <span v-if="msg.pending" class="bubble-pending-spinner"></span>
+                                </div>
+                                <div v-if="blockNoticeText && !isGroupActive" class="chat-block-notice">
+                                    {{ blockNoticeText }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="composer" :style="{ height: `${composerHeight}px` }">
+                        <div class="composer-resize-handle" @mousedown.prevent="startComposerResize"></div>
+                        <div class="composer-toolbar">
+                            <button ref="emojiButtonRef" class="tool-icon-btn" :class="{ 'is-active': showEmojiPicker }"
+                                title="表情" @click.stop="toggleEmojiPicker">
+                                <span class="tool-glyph">&#xE170;</span>
+                            </button>
+                            <teleport to="body">
+                                <div v-if="showEmojiPicker" ref="emojiPickerRef" class="emoji-panel"
+                                    :style="emojiPanelStyle" @click.stop>
+                                    <div class="emoji-tabs">
+                                        <button v-for="tab in emojiTabs" :key="tab.id" class="emoji-tab"
+                                            :class="{ active: emojiTab === tab.id }" type="button"
+                                            @click="emojiTab = tab.id">
+                                            {{ tab.label }}
+                                        </button>
+                                    </div>
+                                    <div v-if="currentEmojiList.length" class="emoji-grid">
+                                        <button v-for="item in currentEmojiList" :key="`${emojiTab}-${item}`"
+                                            class="emoji-btn" type="button" @click="addEmoji(item)">
+                                            {{ item }}
+                                        </button>
+                                    </div>
+                                    <div v-else class="emoji-empty">暂无表情</div>
+                                </div>
+                            </teleport>
+                            <button class="tool-icon-btn" title="剪刀">
+                                <span class="tool-glyph">&#xE8C6;</span>
+                            </button>
+                            <button class="tool-icon-btn" title="文件"
+                                :class="{ 'is-disabled': isGroupActive }" :disabled="isGroupActive"
+                                @click="triggerFileSelect">
+                                <span class="tool-glyph">&#xE8A5;</span>
+                            </button>
+                            <input ref="fileInputRef" class="composer-file-input" type="file"
+                                @change="handleFileSelect" />
+                            <input ref="imageInputRef" class="composer-image-input" type="file" accept="image/*"
+                                multiple @change="handleImageSelect" />
+                            <button class="tool-icon-btn" title="图片"
+                                :class="{ 'is-disabled': isGroupActive }" :disabled="isGroupActive"
+                                @click="triggerImageSelect">
+                                <span class="tool-glyph">&#xEB9F;</span>
+                            </button>
+                            <button class="tool-icon-btn" title="语音" @click="startVoiceCall">
+                                <span class="tool-glyph">&#xE720;</span>
+                            </button>
+                            <div class="tool-spacer"></div>
+                            <button class="tool-icon-btn" title="更多"
+                                :class="{ 'is-active': showMorePanel, 'is-disabled': isGroupActive }"
+                                :disabled="isGroupActive" @click.stop="toggleMorePanel">
+                                <span class="tool-glyph">&#xE712;</span>
+                            </button>
+                        </div>
+                        <div class="composer-body">
+                            <div class="composer-input">
+                                <div v-if="draftImages.length" class="composer-image-list">
+                                    <div v-for="(item, index) in draftImages" :key="item.id || `${item.hash}-${index}`"
+                                        class="composer-image-preview">
+                                        <img :src="item.preview" alt="preview" />
+                                    </div>
+                                </div>
+                                <textarea v-model="draft" ref="composerTextareaRef" placeholder=""
+                                    @keydown.enter.exact.prevent="handleComposerEnter" @keydown.enter.shift.stop
+                                    @keydown.backspace="handleComposerBackspace" @compositionstart="isComposing = true"
+                                    @compositionend="isComposing = false" @paste="handleComposerPaste"></textarea>
+                            </div>
+                        </div>
+                        <div class="composer-actions">
+                            <div class="send-group">
+                                <button class="send-btn" :disabled="!canSend" @click="sendMessage">
+                                    发送
+                                </button>
+                                <button class="send-drop" title="发送选项" @click.stop="toggleSendMenu">
+                                    <span class="tool-glyph">&#xE70D;</span>
+                                </button>
+                                <div v-if="showSendMenu" class="send-menu">
+                                    <div class="send-menu-item">
+                                        <span class="send-tip-mark">&#xE73E;</span>
+                                        <span>按 Enter 键发送消息</span>
+                                    </div>
+                                    <div class="send-menu-item">
+                                        <span class="send-tip-mark">&#xE73E;</span>
+                                        <span>按 Ctrl + Enter 键发送消息</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="showMorePanel" class="chat-side-overlay" @click="closeMorePanel"></div>
+                    <aside ref="morePanelRef" class="chat-side-panel" :class="{ open: showMorePanel }" @click.stop>
+                        <div class="chat-side-card">
+                            <div class="chat-side-row">
+                                <span>设为置顶</span>
+                                <label class="chat-switch">
+                                    <input type="checkbox" :checked="isActivePinned" @change="toggleActivePinned" />
+                                    <span class="chat-switch-slider"></span>
+                                </label>
+                            </div>
+                            <div class="chat-side-row">
+                                <span>消息免打扰</span>
+                                <label class="chat-switch">
+                                    <input type="checkbox" :checked="isActiveMuted" @change="toggleActiveMuted" />
+                                    <span class="chat-switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="chat-side-card">
+                            <button class="chat-side-action" type="button" @click="handlePanelAction('block')">
+                                {{ blockActionLabel }}
+                            </button>
+                            <button class="chat-side-action" type="button" @click="handlePanelAction('files')">
+                                文件传输列表
+                                <span class="chat-side-chev">&#xE76C;</span>
+                            </button>
+                            <button class="chat-side-action" type="button" @click="handlePanelAction('clear')">
+                                删除聊天记录
+                            </button>
+                        </div>
+                        <div class="chat-side-card">
+                            <button class="chat-side-danger" type="button" @click="handlePanelAction('remove')">
+                                删除好友
+                            </button>
+                        </div>
+                        <button class="chat-side-link" type="button" @click="handlePanelAction('report')">
+                            被骚扰了？举报该用户
+                        </button>
+                    </aside>
+                        </div>
+                        <aside v-if="isGroupActive" class="group-panel">
+                            <div class="group-panel-card">
+                                <div class="group-panel-header">
+                                    <span>群公告</span>
+                                    <button class="group-panel-add" type="button"
+                                        @click="startEditGroupAnnouncement">
+                                        +
+                                    </button>
+                                </div>
+                                <div v-if="isEditingGroupAnnouncement" class="group-panel-editor">
+                                    <textarea v-model="groupAnnouncementDraft" maxlength="160"
+                                        placeholder="填写群公告"></textarea>
+                                    <div class="group-panel-actions">
+                                        <button class="group-panel-btn ghost" type="button"
+                                            @click="cancelGroupAnnouncementEdit">
+                                            取消
+                                        </button>
+                                        <button class="group-panel-btn" type="button"
+                                            @click="commitGroupAnnouncement">
+                                            保存
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-else class="group-panel-text">
+                                    {{ activeGroup?.announcement || "暂无群公告" }}
+                                </div>
+                            </div>
+                            <div class="group-panel-card">
+                                <div class="group-member-head">
+                                    <div class="group-member-title">
+                                        群聊成员
+                                        <span class="group-member-count">{{ groupMemberCount }}</span>
+                                    </div>
+                                    <button class="group-member-search-btn" type="button"
+                                        @click="toggleGroupMemberSearch">
+                                        <span class="group-member-search-icon">&#128269;</span>
+                                    </button>
+                                </div>
+                                <div v-if="showGroupMemberSearch" class="group-member-search">
+                                    <input v-model="groupMemberQuery" type="text" placeholder="搜索群成员" />
+                                </div>
+                                <div class="group-member-list">
+                                    <div v-for="member in filteredGroupMembers" :key="member.uid"
+                                        class="group-member">
+                                        <div class="group-member-avatar">
+                                            <img v-if="member.avatar" :src="member.avatar" alt="avatar" />
+                                            <span v-else>{{ member.initials }}</span>
+                                        </div>
+                                        <div class="group-member-meta">
+                                            <div class="group-member-name">{{ member.name }}</div>
+                                            <span v-if="member.roleLabel" class="group-member-role"
+                                                :class="`role-${member.role}`">
+                                                {{ member.roleLabel }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div v-if="!filteredGroupMembers.length" class="group-member-empty">
+                                        未找到成员
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                </template>
+
+                <div v-else class="contacts-panel">
+                    <div class="contacts-header">
+                        <div class="contacts-title">{{ contactsPanelTitle }}</div>
+                        <div class="contacts-tools">
+                            <button v-if="selectedContact" class="tool-btn" title="返回" @click="clearContactProfile">
+                                <span class="tool-icon">&#xE72B;</span>
+                            </button>
+                            <template v-else>
+                                <button class="tool-btn" title="筛选">
+                                    <span class="tool-icon">&#xE71C;</span>
+                                    <span class="tool-dot"></span>
+                                </button>
+                                <button class="tool-btn" title="清空">
+                                    <span class="tool-icon">&#xE74D;</span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="contacts-body">
+                        <div v-if="selectedContact" class="contact-profile">
+                            <div v-if="contactProfileLoading" class="loading">加载中...</div>
+                            <div v-else class="contact-profile-card">
+                                <div class="profile-head">
+                                    <div class="profile-avatar">
+                                        <img v-if="contactProfileSource?.avatar" :src="contactProfileSource?.avatar"
+                                            alt="avatar" />
+                                        <span v-else>{{ contactInitials }}</span>
+                                    </div>
+                                    <div class="profile-meta">
+                                        <div class="profile-name">{{ contactDisplayName }}</div>
+                                        <div class="profile-uid">
+                                            <span>UID {{ contactProfileSource?.uid || "---" }}</span>
+                                            <button class="profile-uid-copy" type="button" title="复制"
+                                                @click="copyProfileUid(contactProfileSource?.uid)">
+                                                ⧉
+                                            </button>
+                                        </div>
+                                        <div class="profile-signature">{{ contactSignature }}</div>
+                                        <div class="profile-details">
+                                            <div class="profile-detail">
+                                                性别：{{ contactProfileSource?.gender || "未设置" }}
+                                            </div>
+                                            <div class="profile-detail">
+                                                生日：{{ contactProfileSource?.birthday || "未设置" }}
+                                            </div>
+                                            <div class="profile-detail">
+                                                城市：{{ contactProfileSource?.country || "未设置"
+                                                }}{{
+                                                    contactProfileSource?.province
+                                                        ? ` / ${contactProfileSource?.province}`
+                                                        : ""
+                                                }}{{
+                                                    contactProfileSource?.region
+                                                        ? ` /
                                                 ${contactProfileSource?.region}`
-                            : ""
-                        }}
-                      </div>
+                                                        : ""
+                                                }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="contact-profile-meta">
+                                    <span class="contact-tag"
+                                        :class="{ offline: contactProfileSource?.online === false }">
+                                        {{
+                                            contactProfileSource?.online === false ? "离线" : "在线"
+                                        }}
+                                    </span>
+                                </div>
+                                <div class="contact-profile-actions">
+                                    <button class="contact-action-btn" type="button" title="分享" @click="openSharePanel">
+                                        <span class="contact-action-icon">&#xE72D;</span>
+                                        <span class="contact-action-text">分享</span>
+                                    </button>
+                                    <button class="contact-action-btn" type="button" title="音视频通话"
+                                        @click="startVoiceCallFromContact">
+                                        <span class="contact-action-icon">&#xE717;</span>
+                                        <span class="contact-action-text">音视频通话</span>
+                                    </button>
+                                    <button class="contact-action-btn primary" type="button" title="发消息"
+                                        @click="enterChatFromContact">
+                                        <span class="contact-action-icon">&#xE8BD;</span>
+                                        <span class="contact-action-text">发消息</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <template v-else>
+                            <div v-if="!incomingRequests.length && !outgoingRequests.length" class="empty-chat">
+                                暂无好友通知
+                            </div>
+                            <div v-else class="notify-list">
+                                <div v-for="req in incomingRequests" :key="`in-${req.uid}`" class="notify-card">
+                                    <div class="notify-avatar">
+                                        <img v-if="req.avatar" :src="req.avatar" alt="avatar" />
+                                        <span v-else>{{
+                                            req.username.slice(0, 2).toUpperCase()
+                                        }}</span>
+                                    </div>
+                                    <div class="notify-main">
+                                        <div class="notify-title">
+                                            <span class="notify-name">{{ req.username }}</span>
+                                            <span class="notify-text">请求加为好友</span>
+                                        </div>
+                                        <div class="notify-sub">UID {{ req.uid }}</div>
+                                    </div>
+                                    <div class="notify-actions">
+                                        <button class="notify-accept" @click="handleRequestAction(req.uid, 'accept')">
+                                            同意
+                                        </button>
+                                        <button class="notify-reject" @click="handleRequestAction(req.uid, 'reject')">
+                                            拒绝
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-for="req in outgoingRequests" :key="`out-${req.uid}`" class="notify-card">
+                                    <div class="notify-avatar">
+                                        <img v-if="req.avatar" :src="req.avatar" alt="avatar" />
+                                        <span v-else>{{
+                                            req.username.slice(0, 2).toUpperCase()
+                                        }}</span>
+                                    </div>
+                                    <div class="notify-main">
+                                        <div class="notify-title">
+                                            <span class="notify-name">{{ req.username }}</span>
+                                            <span class="notify-text">等待验证</span>
+                                        </div>
+                                        <div class="notify-sub">UID {{ req.uid }}</div>
+                                    </div>
+                                    <div class="notify-actions">
+                                        <span class="notify-status" :class="`status-${req.status}`">
+                                            {{ req.status === "rejected" ? "已拒绝" : "等待验证" }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
-                  </div>
                 </div>
-                <div class="contact-profile-meta">
-                  <span
-                    class="contact-tag"
-                    :class="{ offline: contactProfileSource?.online === false }"
-                  >
-                    {{
-                      contactProfileSource?.online === false ? "离线" : "在线"
-                    }}
-                  </span>
-                </div>
-                <div class="contact-profile-actions">
-                  <button
-                    class="contact-action-btn"
-                    type="button"
-                    title="分享"
-                    @click="openSharePanel"
-                  >
-                    <span class="contact-action-icon">&#xE72D;</span>
-                    <span class="contact-action-text">分享</span>
-                  </button>
-                  <button
-                    class="contact-action-btn"
-                    type="button"
-                    title="音视频通话"
-                    @click="startVoiceCallFromContact"
-                  >
-                    <span class="contact-action-icon">&#xE717;</span>
-                    <span class="contact-action-text">音视频通话</span>
-                  </button>
-                  <button
-                    class="contact-action-btn primary"
-                    type="button"
-                    title="发消息"
-                    @click="enterChatFromContact"
-                  >
-                    <span class="contact-action-icon">&#xE8BD;</span>
-                    <span class="contact-action-text">发消息</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <template v-else>
-              <div
-                v-if="!incomingRequests.length && !outgoingRequests.length"
-                class="empty-chat"
-              >
-                暂无好友通知
-              </div>
-              <div v-else class="notify-list">
-                <div
-                  v-for="req in incomingRequests"
-                  :key="`in-${req.uid}`"
-                  class="notify-card"
-                >
-                  <div class="notify-avatar">
-                    <img v-if="req.avatar" :src="req.avatar" alt="avatar" />
-                    <span v-else>{{
-                      req.username.slice(0, 2).toUpperCase()
-                    }}</span>
-                  </div>
-                  <div class="notify-main">
-                    <div class="notify-title">
-                      <span class="notify-name">{{ req.username }}</span>
-                      <span class="notify-text">请求加为好友</span>
-                    </div>
-                    <div class="notify-sub">UID {{ req.uid }}</div>
-                  </div>
-                  <div class="notify-actions">
-                    <button
-                      class="notify-accept"
-                      @click="handleRequestAction(req.uid, 'accept')"
-                    >
-                      同意
-                    </button>
-                    <button
-                      class="notify-reject"
-                      @click="handleRequestAction(req.uid, 'reject')"
-                    >
-                      拒绝
-                    </button>
-                  </div>
-                </div>
-                <div
-                  v-for="req in outgoingRequests"
-                  :key="`out-${req.uid}`"
-                  class="notify-card"
-                >
-                  <div class="notify-avatar">
-                    <img v-if="req.avatar" :src="req.avatar" alt="avatar" />
-                    <span v-else>{{
-                      req.username.slice(0, 2).toUpperCase()
-                    }}</span>
-                  </div>
-                  <div class="notify-main">
-                    <div class="notify-title">
-                      <span class="notify-name">{{ req.username }}</span>
-                      <span class="notify-text">等待验证</span>
-                    </div>
-                    <div class="notify-sub">UID {{ req.uid }}</div>
-                  </div>
-                  <div class="notify-actions">
-                    <span class="notify-status" :class="`status-${req.status}`">
-                      {{ req.status === "rejected" ? "已拒绝" : "等待验证" }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </div>
+            </section>
+        </main>
+        <div v-if="showListMenu" ref="listMenuRef" class="list-context-menu" :style="{
+            top: `${listMenuPosition.y}px`,
+            left: `${listMenuPosition.x}px`,
+        }" @click.stop>
+            <button class="list-context-item" type="button" @click="pinFriendFromMenu">
+                {{ isPinned(listMenuFriend?.uid) ? "取消置顶" : "置顶" }}
+            </button>
+            <button class="list-context-item" type="button" @click="copyUidFromMenu">
+                复制UID
+            </button>
+            <button class="list-context-item" type="button" @click="toggleUnreadFromMenu">
+                {{ isUnread(listMenuFriend?.uid) ? "标记已读" : "标记未读" }}
+            </button>
+            <button class="list-context-item" type="button" @click="openDetachedChatFromMenu">
+                打开独立聊天窗口
+            </button>
+            <button class="list-context-item" type="button" @click="toggleMuteFromMenu">
+                设置免打扰
+            </button>
+            <button class="list-context-item danger" type="button" @click="removeFromListFromMenu">
+                从消息列表中移除
+            </button>
         </div>
-      </section>
-    </main>
-    <div
-      v-if="showListMenu"
-      ref="listMenuRef"
-      class="list-context-menu"
-      :style="{
-        top: `${listMenuPosition.y}px`,
-        left: `${listMenuPosition.x}px`,
-      }"
-      @click.stop
-    >
-      <button
-        class="list-context-item"
-        type="button"
-        @click="pinFriendFromMenu"
-      >
-        {{ isPinned(listMenuFriend?.uid) ? "取消置顶" : "置顶" }}
-      </button>
-      <button class="list-context-item" type="button" @click="copyUidFromMenu">
-        复制UID
-      </button>
-      <button
-        class="list-context-item"
-        type="button"
-        @click="toggleUnreadFromMenu"
-      >
-        {{ isUnread(listMenuFriend?.uid) ? "标记已读" : "标记未读" }}
-      </button>
-      <button
-        class="list-context-item"
-        type="button"
-        @click="openDetachedChatFromMenu"
-      >
-        打开独立聊天窗口
-      </button>
-      <button
-        class="list-context-item"
-        type="button"
-        @click="toggleMuteFromMenu"
-      >
-        设置免打扰
-      </button>
-      <button
-        class="list-context-item danger"
-        type="button"
-        @click="removeFromListFromMenu"
-      >
-        从消息列表中移除
-      </button>
+        <transition name="profile-modal" appear>
+            <div v-show="isEditOpen" class="profile-modal">
+                <div class="profile-modal__backdrop" @click="closeEditProfile"></div>
+                <div class="profile-modal__panel">
+                    <div class="profile-modal__header">
+                        <div class="profile-modal__title">编辑资料</div>
+                        <button class="profile-modal__close" type="button" @click="closeEditProfile">
+                            ×
+                        </button>
+                    </div>
+                    <div class="profile-modal__body">
+                        <div class="profile-modal__avatar">
+                            <img v-if="editForm.avatar" :src="editForm.avatar" alt="avatar" />
+                            <span v-else>{{ initials }}</span>
+                        </div>
+                        <div class="profile-modal__upload">
+                            <input ref="avatarInputRef" class="profile-modal__file" type="file" accept="image/*"
+                                @change="handleAvatarChange" />
+                            <button class="profile-btn ghost" type="button" @click="triggerAvatarSelect">
+                                上传头像
+                            </button>
+                            <button v-if="editForm.avatar" class="profile-btn ghost" type="button" @click="clearAvatar">
+                                移除
+                            </button>
+                        </div>
+
+                        <label class="profile-field" :class="{ 'is-invalid': nicknameInvalid }">
+                            <span class="profile-field__label">昵称</span>
+                            <div class="profile-field__control">
+                                <input v-model.trim="editForm.nickname" type="text" maxlength="36"
+                                    placeholder="请输入昵称" />
+                                <span class="profile-field__count">{{ nicknameCount }}/36</span>
+                            </div>
+                        </label>
+
+                        <label class="profile-field">
+                            <span class="profile-field__label">个签</span>
+                            <div class="profile-field__control">
+                                <input v-model.trim="editForm.signature" type="text" maxlength="80"
+                                    placeholder="编辑个签，展示我的独特态度" />
+                                <span class="profile-field__count">{{ signatureCount }}/80</span>
+                            </div>
+                        </label>
+
+                        <label class="profile-field">
+                            <span class="profile-field__label">性别</span>
+                            <SelectField v-model="editForm.gender" :options="genderOptions" autoScroll />
+                        </label>
+
+                        <label class="profile-field">
+                            <span class="profile-field__label">生日</span>
+                            <DateSelect v-model="editForm.birthday" />
+                        </label>
+
+                        <label class="profile-field">
+                            <span class="profile-field__label">国家</span>
+                            <SelectField v-model="editForm.country" :options="countryOptions" autoScroll />
+                        </label>
+
+                        <div v-if="editForm.country === '中国'" class="profile-field profile-field--split">
+                            <label>
+                                <span class="profile-field__label">省份</span>
+                                <SelectField v-model="editForm.province" :options="provinceOptions" autoScroll />
+                            </label>
+                            <label>
+                                <span class="profile-field__label">城市</span>
+                                <SelectField v-model="editForm.region" :options="cityOptions"
+                                    :disabled="!cityOptions.length" autoScroll />
+                            </label>
+                        </div>
+                    </div>
+                    <div class="profile-modal__footer">
+                        <button class="profile-btn" type="button" @click="saveProfile">
+                            保存
+                        </button>
+                        <button class="profile-btn ghost" type="button" @click="closeEditProfile">
+                            取消
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+        <transition name="profile-modal" appear>
+            <div v-show="isCropOpen" class="crop-modal">
+                <div class="profile-modal__backdrop" @click="closeCropper"></div>
+                <div class="crop-modal__panel">
+                    <div class="profile-modal__header">
+                        <div class="profile-modal__title">裁切头像</div>
+                        <button class="profile-modal__close" type="button" @click="closeCropper">
+                            ×
+                        </button>
+                    </div>
+                    <div class="crop-modal__body">
+                        <div class="crop-frame" @pointerdown.prevent="startCropDrag">
+                            <img v-if="cropSource" class="crop-image" :src="cropSource" :style="cropImageStyle"
+                                alt="crop" draggable="false" />
+                        </div>
+                        <div class="crop-controls">
+                            <label class="crop-zoom">
+                                <span>缩放</span>
+                                <input type="range" min="1" max="3" step="0.01" v-model.number="cropScale" />
+                            </label>
+                        </div>
+                    </div>
+                    <div class="profile-modal__footer">
+                        <button class="profile-btn" type="button" @click="applyCrop">
+                            确定
+                        </button>
+                        <button class="profile-btn ghost" type="button" @click="closeCropper">
+                            取消
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+        <transition name="profile-modal" appear>
+            <div v-show="showSharePanel" class="share-modal">
+                <div class="profile-modal__backdrop" @click="closeSharePanel"></div>
+                <div class="share-panel">
+                    <div class="share-left">
+                        <div class="share-search">
+                            <span class="search-icon">&#128269;</span>
+                            <input v-model.trim="shareQuery" type="text" placeholder="搜索" />
+                        </div>
+                        <button class="share-create-btn" type="button">
+                            创建群聊并转发
+                        </button>
+                        <div class="share-section-title">最近聊天</div>
+                        <div class="share-list">
+                            <button v-for="friend in shareTargets" :key="`share-${friend.uid}`" class="share-item"
+                                type="button" @click="shareTargetUid = friend.uid">
+                                <span class="share-radio" :class="{ selected: shareTargetUid === friend.uid }"></span>
+                                <span class="share-avatar">
+                                    <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                    <span v-else>{{
+                                        friend.username?.slice(0, 2).toUpperCase()
+                                    }}</span>
+                                </span>
+                                <span class="share-name">{{
+                                    friend.nickname || friend.username
+                                }}</span>
+                            </button>
+                            <div v-if="!shareTargets.length" class="share-empty">
+                                暂无最近聊天
+                            </div>
+                        </div>
+                    </div>
+                    <div class="share-right">
+                        <div class="share-header">分享至：</div>
+                        <div class="share-target-name">
+                            {{ shareTargetName || "请选择好友" }}
+                        </div>
+                        <div class="share-card">
+                            <div class="share-card-title">名片</div>
+                            <div class="share-card-main">
+                                <div class="share-card-avatar">
+                                    <img v-if="shareCardAvatar" :src="shareCardAvatar" alt="avatar" />
+                                    <span v-else>{{ shareCardInitials }}</span>
+                                </div>
+                                <div class="share-card-meta">
+                                    <div class="share-card-name">{{ shareCardName }}</div>
+                                    <div class="share-card-uid">UID {{ shareCardUid }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="share-note">
+                            <textarea v-model.trim="shareNote" placeholder="留言"></textarea>
+                        </div>
+                        <div class="share-actions">
+                            <button class="share-confirm" type="button" :disabled="!shareTargetUid"
+                                @click="confirmShareCard">
+                                确定
+                            </button>
+                            <button class="share-cancel" type="button" @click="closeSharePanel">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+        <transition name="file-modal" appear>
+            <div v-show="isFileModalOpen" class="file-modal">
+                <div class="file-modal__backdrop" @click="closeFileModal"></div>
+                <div class="file-modal__panel">
+                    <div class="file-modal__header">
+                        <div class="file-modal__title">
+                            发送给 {{ activeFriend?.username || "好友" }}
+                        </div>
+                        <button class="file-modal__close" type="button" @click="closeFileModal">
+                            ×
+                        </button>
+                    </div>
+                    <div class="file-modal__body">
+                        <div class="file-modal__card">
+                            <div class="file-modal__icon">&#xE8A5;</div>
+                            <div class="file-modal__meta">
+                                <div class="file-modal__name">
+                                    {{ fileDraft?.name || "未命名文件" }}
+                                </div>
+                                <div class="file-modal__size">
+                                    {{ formatBytes(fileDraft?.size) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="file-modal__footer">
+                        <button class="file-modal__send" type="button" :disabled="!canSendFile"
+                            @click="sendFileMessage">
+                            发送(1)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+        <transition name="file-modal" appear>
+            <div v-show="showGroupModal" class="group-modal">
+                <div class="file-modal__backdrop" @click="closeGroupModal"></div>
+                <div class="group-modal__panel">
+                    <div class="group-modal__header">
+                        <div class="group-modal__title">创建群聊</div>
+                        <button class="group-modal__close" type="button" @click="closeGroupModal">
+                            ×
+                        </button>
+                    </div>
+                    <div class="group-modal__body">
+                        <div class="group-modal__left">
+                            <div class="group-search">
+                                <span class="group-search__icon">&#xE8B2;</span>
+                                <input v-model="groupSearch" class="group-search__input" type="text"
+                                    placeholder="搜索好友" />
+                            </div>
+                            <div class="group-list">
+                                <button v-for="friend in filteredGroupFriends" :key="friend.uid" class="group-item"
+                                    type="button" @click="toggleGroupSelection(friend)">
+                                    <span class="group-check" :class="{ active: isGroupSelected(friend.uid) }"></span>
+                                    <span class="group-avatar">
+                                        <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                        <span v-else>{{
+                                            friend.username?.slice(0, 2).toUpperCase()
+                                        }}</span>
+                                    </span>
+                                    <span class="group-name">{{ friend.username }}</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="group-modal__right">
+                            <div class="group-selected-title">
+                                已选 {{ selectedGroupUids.length }} 人
+                            </div>
+                            <div class="group-selected-list">
+                                <div v-for="friend in selectedGroupFriends" :key="friend.uid"
+                                    class="group-selected-item">
+                                    <span class="group-avatar">
+                                        <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                        <span v-else>{{
+                                            friend.username?.slice(0, 2).toUpperCase()
+                                        }}</span>
+                                    </span>
+                                    <span class="group-name">{{ friend.username }}</span>
+                                    <button class="group-remove" type="button" @click="toggleGroupSelection(friend)">
+                                        ×
+                                    </button>
+                                </div>
+                                <div v-if="!selectedGroupFriends.length" class="group-empty">
+                                    选择好友开始建群
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="group-modal__footer">
+                        <button class="group-cancel" type="button" @click="closeGroupModal">
+                            取消
+                        </button>
+                        <button class="group-confirm" type="button" :disabled="!selectedGroupUids.length"
+                            @click="confirmCreateGroup">
+                            确定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+        <transition name="file-modal" appear>
+            <div v-if="showChatGroupModal" class="chat-group-modal" @click.self="closeChatGroupModal">
+                <div class="chat-group-panel">
+                    <div class="chat-group-body">
+                        <div class="chat-group-left">
+                            <div class="chat-group-search">
+                                <span class="chat-group-search-icon">&#128269;</span>
+                                <input v-model="chatGroupQuery" type="text" placeholder="搜索" />
+                            </div>
+                            <div class="chat-group-section-title">
+                                {{ chatGroupQuery ? "搜索结果" : "最近聊天" }}
+                            </div>
+                            <div class="chat-group-list">
+                                <button v-for="user in chatGroupVisibleUsers" :key="user.uid"
+                                    class="chat-group-item" type="button"
+                                    @click="toggleChatGroupSelection(user.uid)">
+                                    <span class="chat-group-check" :class="{
+                                        active: isChatGroupSelected(user.uid),
+                                        locked: user.uid === auth.uid,
+                                    }"></span>
+                                    <span class="chat-group-avatar">
+                                        <img v-if="user.avatar" :src="user.avatar" alt="avatar" />
+                                        <span v-else>{{ user.initials }}</span>
+                                    </span>
+                                    <span class="chat-group-name">
+                                        {{ user.name }}
+                                        <small v-if="user.uid === auth.uid">（我）</small>
+                                    </span>
+                                </button>
+                                <div v-if="!chatGroupVisibleUsers.length" class="chat-group-empty">
+                                    暂无符合条件的用户
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-group-right">
+                            <div class="chat-group-right-title">选择联系人</div>
+                            <div class="chat-group-selected">
+                                <div v-for="user in chatGroupSelectedUsers" :key="user.uid"
+                                    class="chat-group-selected-item">
+                                    <span class="chat-group-avatar">
+                                        <img v-if="user.avatar" :src="user.avatar" alt="avatar" />
+                                        <span v-else>{{ user.initials }}</span>
+                                    </span>
+                                    <span class="chat-group-name">
+                                        {{ user.name }}
+                                    </span>
+                                    <button v-if="user.uid !== auth.uid" class="chat-group-remove" type="button"
+                                        @click="toggleChatGroupSelection(user.uid)">
+                                        ×
+                                    </button>
+                                    <span v-else class="chat-group-owner-tag">群主</span>
+                                </div>
+                                <div v-if="chatGroupSelectedUids.length <= 1" class="chat-group-empty">
+                                    勾选联系人开始建群
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-group-footer">
+                        <button class="chat-group-cancel" type="button" @click="closeChatGroupModal">
+                            取消
+                        </button>
+                        <button class="chat-group-confirm" type="button"
+                            :disabled="chatGroupSelectedUids.length < 2" @click="confirmChatGroupCreate">
+                            确定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
     </div>
-    <transition name="profile-modal" appear>
-      <div v-show="isEditOpen" class="profile-modal">
-        <div class="profile-modal__backdrop" @click="closeEditProfile"></div>
-        <div class="profile-modal__panel">
-          <div class="profile-modal__header">
-            <div class="profile-modal__title">编辑资料</div>
-            <button
-              class="profile-modal__close"
-              type="button"
-              @click="closeEditProfile"
-            >
-              ×
-            </button>
-          </div>
-          <div class="profile-modal__body">
-            <div class="profile-modal__avatar">
-              <img v-if="editForm.avatar" :src="editForm.avatar" alt="avatar" />
-              <span v-else>{{ initials }}</span>
-            </div>
-            <div class="profile-modal__upload">
-              <input
-                ref="avatarInputRef"
-                class="profile-modal__file"
-                type="file"
-                accept="image/*"
-                @change="handleAvatarChange"
-              />
-              <button
-                class="profile-btn ghost"
-                type="button"
-                @click="triggerAvatarSelect"
-              >
-                上传头像
-              </button>
-              <button
-                v-if="editForm.avatar"
-                class="profile-btn ghost"
-                type="button"
-                @click="clearAvatar"
-              >
-                移除
-              </button>
-            </div>
-
-            <label
-              class="profile-field"
-              :class="{ 'is-invalid': nicknameInvalid }"
-            >
-              <span class="profile-field__label">昵称</span>
-              <div class="profile-field__control">
-                <input
-                  v-model.trim="editForm.nickname"
-                  type="text"
-                  maxlength="36"
-                  placeholder="请输入昵称"
-                />
-                <span class="profile-field__count">{{ nicknameCount }}/36</span>
-              </div>
-            </label>
-
-            <label class="profile-field">
-              <span class="profile-field__label">个签</span>
-              <div class="profile-field__control">
-                <input
-                  v-model.trim="editForm.signature"
-                  type="text"
-                  maxlength="80"
-                  placeholder="编辑个签，展示我的独特态度"
-                />
-                <span class="profile-field__count"
-                  >{{ signatureCount }}/80</span
-                >
-              </div>
-            </label>
-
-            <label class="profile-field">
-              <span class="profile-field__label">性别</span>
-              <SelectField
-                v-model="editForm.gender"
-                :options="genderOptions"
-                autoScroll
-              />
-            </label>
-
-            <label class="profile-field">
-              <span class="profile-field__label">生日</span>
-              <DateSelect v-model="editForm.birthday" />
-            </label>
-
-            <label class="profile-field">
-              <span class="profile-field__label">国家</span>
-              <SelectField
-                v-model="editForm.country"
-                :options="countryOptions"
-                autoScroll
-              />
-            </label>
-
-            <div
-              v-if="editForm.country === '中国'"
-              class="profile-field profile-field--split"
-            >
-              <label>
-                <span class="profile-field__label">省份</span>
-                <SelectField
-                  v-model="editForm.province"
-                  :options="provinceOptions"
-                  autoScroll
-                />
-              </label>
-              <label>
-                <span class="profile-field__label">城市</span>
-                <SelectField
-                  v-model="editForm.region"
-                  :options="cityOptions"
-                  :disabled="!cityOptions.length"
-                  autoScroll
-                />
-              </label>
-            </div>
-          </div>
-          <div class="profile-modal__footer">
-            <button class="profile-btn" type="button" @click="saveProfile">
-              保存
-            </button>
-            <button
-              class="profile-btn ghost"
-              type="button"
-              @click="closeEditProfile"
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
-    <transition name="profile-modal" appear>
-      <div v-show="isCropOpen" class="crop-modal">
-        <div class="profile-modal__backdrop" @click="closeCropper"></div>
-        <div class="crop-modal__panel">
-          <div class="profile-modal__header">
-            <div class="profile-modal__title">裁切头像</div>
-            <button
-              class="profile-modal__close"
-              type="button"
-              @click="closeCropper"
-            >
-              ×
-            </button>
-          </div>
-          <div class="crop-modal__body">
-            <div class="crop-frame" @pointerdown.prevent="startCropDrag">
-              <img
-                v-if="cropSource"
-                class="crop-image"
-                :src="cropSource"
-                :style="cropImageStyle"
-                alt="crop"
-                draggable="false"
-              />
-            </div>
-            <div class="crop-controls">
-              <label class="crop-zoom">
-                <span>缩放</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="3"
-                  step="0.01"
-                  v-model.number="cropScale"
-                />
-              </label>
-            </div>
-          </div>
-          <div class="profile-modal__footer">
-            <button class="profile-btn" type="button" @click="applyCrop">
-              确定
-            </button>
-            <button
-              class="profile-btn ghost"
-              type="button"
-              @click="closeCropper"
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
-    <transition name="profile-modal" appear>
-      <div v-show="showSharePanel" class="share-modal">
-        <div class="profile-modal__backdrop" @click="closeSharePanel"></div>
-        <div class="share-panel">
-          <div class="share-left">
-            <div class="share-search">
-              <span class="search-icon">&#128269;</span>
-              <input v-model.trim="shareQuery" type="text" placeholder="搜索" />
-            </div>
-            <button class="share-create-btn" type="button">
-              创建群聊并转发
-            </button>
-            <div class="share-section-title">最近聊天</div>
-            <div class="share-list">
-              <button
-                v-for="friend in shareTargets"
-                :key="`share-${friend.uid}`"
-                class="share-item"
-                type="button"
-                @click="shareTargetUid = friend.uid"
-              >
-                <span
-                  class="share-radio"
-                  :class="{ selected: shareTargetUid === friend.uid }"
-                ></span>
-                <span class="share-avatar">
-                  <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
-                  <span v-else>{{
-                    friend.username?.slice(0, 2).toUpperCase()
-                  }}</span>
-                </span>
-                <span class="share-name">{{
-                  friend.nickname || friend.username
-                }}</span>
-              </button>
-              <div v-if="!shareTargets.length" class="share-empty">
-                暂无最近聊天
-              </div>
-            </div>
-          </div>
-          <div class="share-right">
-            <div class="share-header">分享至：</div>
-            <div class="share-target-name">
-              {{ shareTargetName || "请选择好友" }}
-            </div>
-            <div class="share-card">
-              <div class="share-card-title">名片</div>
-              <div class="share-card-main">
-                <div class="share-card-avatar">
-                  <img
-                    v-if="shareCardAvatar"
-                    :src="shareCardAvatar"
-                    alt="avatar"
-                  />
-                  <span v-else>{{ shareCardInitials }}</span>
-                </div>
-                <div class="share-card-meta">
-                  <div class="share-card-name">{{ shareCardName }}</div>
-                  <div class="share-card-uid">UID {{ shareCardUid }}</div>
-                </div>
-              </div>
-            </div>
-            <div class="share-note">
-              <textarea v-model.trim="shareNote" placeholder="留言"></textarea>
-            </div>
-            <div class="share-actions">
-              <button
-                class="share-confirm"
-                type="button"
-                :disabled="!shareTargetUid"
-                @click="confirmShareCard"
-              >
-                确定
-              </button>
-              <button
-                class="share-cancel"
-                type="button"
-                @click="closeSharePanel"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
-    <transition name="file-modal" appear>
-      <div v-show="isFileModalOpen" class="file-modal">
-        <div class="file-modal__backdrop" @click="closeFileModal"></div>
-        <div class="file-modal__panel">
-          <div class="file-modal__header">
-            <div class="file-modal__title">
-              发送给 {{ activeFriend?.username || "好友" }}
-            </div>
-            <button
-              class="file-modal__close"
-              type="button"
-              @click="closeFileModal"
-            >
-              ×
-            </button>
-          </div>
-          <div class="file-modal__body">
-            <div class="file-modal__card">
-              <div class="file-modal__icon">&#xE8A5;</div>
-              <div class="file-modal__meta">
-                <div class="file-modal__name">
-                  {{ fileDraft?.name || "未命名文件" }}
-                </div>
-                <div class="file-modal__size">
-                  {{ formatBytes(fileDraft?.size) }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="file-modal__footer">
-            <button
-              class="file-modal__send"
-              type="button"
-              :disabled="!canSendFile"
-              @click="sendFileMessage"
-            >
-              发送(1)
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
-    <transition name="file-modal" appear>
-      <div v-show="showGroupModal" class="group-modal">
-        <div class="file-modal__backdrop" @click="closeGroupModal"></div>
-        <div class="group-modal__panel">
-          <div class="group-modal__header">
-            <div class="group-modal__title">创建群聊</div>
-            <button
-              class="group-modal__close"
-              type="button"
-              @click="closeGroupModal"
-            >
-              ×
-            </button>
-          </div>
-          <div class="group-modal__body">
-            <div class="group-modal__left">
-              <div class="group-search">
-                <span class="group-search__icon">&#xE8B2;</span>
-                <input
-                  v-model="groupSearch"
-                  class="group-search__input"
-                  type="text"
-                  placeholder="搜索好友"
-                />
-              </div>
-              <div class="group-list">
-                <button
-                  v-for="friend in filteredGroupFriends"
-                  :key="friend.uid"
-                  class="group-item"
-                  type="button"
-                  @click="toggleGroupSelection(friend)"
-                >
-                  <span
-                    class="group-check"
-                    :class="{ active: isGroupSelected(friend.uid) }"
-                  ></span>
-                  <span class="group-avatar">
-                    <img
-                      v-if="friend.avatar"
-                      :src="friend.avatar"
-                      alt="avatar"
-                    />
-                    <span v-else>{{
-                      friend.username?.slice(0, 2).toUpperCase()
-                    }}</span>
-                  </span>
-                  <span class="group-name">{{ friend.username }}</span>
-                </button>
-              </div>
-            </div>
-            <div class="group-modal__right">
-              <div class="group-selected-title">
-                已选 {{ selectedGroupUids.length }} 人
-              </div>
-              <div class="group-selected-list">
-                <div
-                  v-for="friend in selectedGroupFriends"
-                  :key="friend.uid"
-                  class="group-selected-item"
-                >
-                  <span class="group-avatar">
-                    <img
-                      v-if="friend.avatar"
-                      :src="friend.avatar"
-                      alt="avatar"
-                    />
-                    <span v-else>{{
-                      friend.username?.slice(0, 2).toUpperCase()
-                    }}</span>
-                  </span>
-                  <span class="group-name">{{ friend.username }}</span>
-                  <button
-                    class="group-remove"
-                    type="button"
-                    @click="toggleGroupSelection(friend)"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div v-if="!selectedGroupFriends.length" class="group-empty">
-                  选择好友开始建群
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="group-modal__footer">
-            <button class="group-cancel" type="button" @click="closeGroupModal">
-              取消
-            </button>
-            <button
-              class="group-confirm"
-              type="button"
-              :disabled="!selectedGroupUids.length"
-              @click="confirmCreateGroup"
-            >
-              确定
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
-  </div>
 </template>
 
 <script setup>
@@ -1576,6 +1316,19 @@ const showGroupModal = ref(false);
 const groupSearch = ref("");
 const selectedGroupUids = ref([]);
 const isComposing = ref(false);
+const showChatGroupModal = ref(false);
+const chatGroupQuery = ref("");
+const chatGroupSelectedUids = ref([]);
+const groups = ref([]);
+const activeGroup = ref(null);
+const groupMessages = ref({});
+const groupNameDraft = ref("");
+const isEditingGroupName = ref(false);
+const groupNameInputRef = ref(null);
+const groupAnnouncementDraft = ref("");
+const isEditingGroupAnnouncement = ref(false);
+const showGroupMemberSearch = ref(false);
+const groupMemberQuery = ref("");
 
 const handleMin = () => window.electronAPI?.windowMin?.();
 const handleMax = () => window.electronAPI?.windowMax?.();
@@ -2696,6 +2449,7 @@ const toggleSendMenu = () => {
 };
 
 const toggleMorePanel = () => {
+  if (isGroupActive.value) return;
   showMorePanel.value = !showMorePanel.value;
 };
 
@@ -3079,13 +2833,220 @@ const selectedGroupFriends = computed(() =>
   ),
 );
 
+const buildGroupName = (ownerName, memberNames) => {
+  const names = [ownerName, ...memberNames].filter((item) => item && item.trim());
+  return names.join("、") || "群聊";
+};
+
+const getGroupInitials = (group) => {
+  const name = group?.name || "群聊";
+  return name.slice(0, 2);
+};
+
+const getFriendByUid = (uid) =>
+  friends.value.find((item) => item.uid === uid) || null;
+
+const resolveGroupMemberProfile = (uid) => {
+  if (uid === auth.value.uid) {
+    return {
+      uid,
+      name: displayName.value,
+      avatar: auth.value.avatar || "",
+    };
+  }
+  const friend = getFriendByUid(uid);
+  return {
+    uid,
+    name: friend?.username || `UID ${uid}`,
+    avatar: friend?.avatar || "",
+  };
+};
+
+const normalizeGroupUids = (uids) => {
+  const set = new Set();
+  (uids || []).forEach((uid) => {
+    const value = Number(uid);
+    if (Number.isFinite(value)) {
+      set.add(value);
+    }
+  });
+  if (Number.isFinite(auth.value.uid)) {
+    set.add(auth.value.uid);
+  }
+  return Array.from(set);
+};
+
+const createGroupFromUids = (uids) => {
+  const normalized = normalizeGroupUids(uids);
+  if (normalized.length < 2) {
+    statusText.value = "请选择至少两位联系人";
+    return false;
+  }
+  const ownerName = displayName.value;
+  const memberNames = normalized
+    .filter((uid) => uid !== auth.value.uid)
+    .map((uid) => getFriendByUid(uid)?.username || `UID ${uid}`);
+  const groupId = `group-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const adminUid = normalized.find((uid) => uid !== auth.value.uid);
+  const members = normalized.map((uid) => ({
+    uid,
+    role:
+      uid === auth.value.uid
+        ? "owner"
+        : uid === adminUid
+          ? "admin"
+          : "member",
+  }));
+  const group = {
+    id: groupId,
+    name: buildGroupName(ownerName, memberNames),
+    ownerUid: auth.value.uid,
+    members,
+    announcement: "",
+    createdAt: new Date().toISOString(),
+  };
+  groups.value = [group, ...groups.value];
+  activeGroup.value = group;
+  activeFriend.value = null;
+  activeView.value = "chat";
+  isEditingGroupName.value = false;
+  showGroupMemberSearch.value = false;
+  groupMemberQuery.value = "";
+  statusText.value = "群聊已创建";
+  return true;
+};
+
 const confirmCreateGroup = () => {
   if (!selectedGroupUids.value.length) {
     statusText.value = "请选择好友";
     return;
   }
-  statusText.value = "群聊创建功能待完善";
+  createGroupFromUids(selectedGroupUids.value);
   closeGroupModal();
+};
+
+const chatGroupSelfUser = computed(() => {
+  const name = displayName.value || "我";
+  return {
+    uid: auth.value.uid,
+    name,
+    avatar: auth.value.avatar || "",
+    initials: name.slice(0, 2).toUpperCase(),
+  };
+});
+
+const mapFriendToChatGroupUser = (friend) => {
+  const name =
+    friend?.nickname || friend?.username || `UID ${friend?.uid || ""}`;
+  return {
+    uid: friend?.uid,
+    name,
+    avatar: friend?.avatar || "",
+    initials: name.slice(0, 2).toUpperCase(),
+  };
+};
+
+const chatGroupRecentUsers = computed(() => {
+  const list = friends.value || [];
+  return list
+    .filter((item) => recentChatMap.value?.[item.uid])
+    .sort((a, b) => {
+      const aTime = Number(recentChatMap.value?.[a.uid]) || 0;
+      const bTime = Number(recentChatMap.value?.[b.uid]) || 0;
+      return bTime - aTime;
+    })
+    .map((item) => mapFriendToChatGroupUser(item));
+});
+
+const chatGroupVisibleUsers = computed(() => {
+  const query = chatGroupQuery.value.trim().toLowerCase();
+  const base = query
+    ? friends.value
+        .filter((item) => {
+          const name = (item.username || "").toLowerCase();
+          const nickname = (item.nickname || "").toLowerCase();
+          const uidText = String(item.uid || "");
+          return (
+            name.includes(query) ||
+            nickname.includes(query) ||
+            uidText.includes(query)
+          );
+        })
+        .map((item) => mapFriendToChatGroupUser(item))
+    : chatGroupRecentUsers.value;
+  const next = [];
+  const seen = new Set();
+  const selfUser = chatGroupSelfUser.value;
+  if (Number.isFinite(selfUser.uid)) {
+    next.push(selfUser);
+    seen.add(selfUser.uid);
+  }
+  base.forEach((item) => {
+    if (!Number.isFinite(item?.uid)) return;
+    if (seen.has(item.uid)) return;
+    seen.add(item.uid);
+    next.push(item);
+  });
+  if (query) {
+    const selfMatch = selfUser?.name?.toLowerCase?.().includes(query);
+    if (!selfMatch && next[0]?.uid === auth.value.uid) {
+      next.shift();
+    }
+  }
+  return next;
+});
+
+const chatGroupSelectedUsers = computed(() => {
+  const ordered = [];
+  const seen = new Set();
+  if (Number.isFinite(auth.value.uid)) {
+    ordered.push(auth.value.uid);
+    seen.add(auth.value.uid);
+  }
+  (chatGroupSelectedUids.value || []).forEach((uid) => {
+    const value = Number(uid);
+    if (!Number.isFinite(value) || seen.has(value)) return;
+    seen.add(value);
+    ordered.push(value);
+  });
+  return ordered.map((uid) => {
+    if (uid === auth.value.uid) return chatGroupSelfUser.value;
+    const friend = getFriendByUid(uid);
+    return mapFriendToChatGroupUser(friend || { uid });
+  });
+});
+
+const openChatGroupModal = () => {
+  chatGroupQuery.value = "";
+  chatGroupSelectedUids.value = Number.isFinite(auth.value.uid)
+    ? [auth.value.uid]
+    : [];
+  showChatGroupModal.value = true;
+};
+
+const closeChatGroupModal = () => {
+  showChatGroupModal.value = false;
+  chatGroupQuery.value = "";
+  chatGroupSelectedUids.value = [];
+};
+
+const toggleChatGroupSelection = (uid) => {
+  if (!Number.isFinite(uid)) return;
+  if (uid === auth.value.uid) return;
+  const exists = chatGroupSelectedUids.value.includes(uid);
+  chatGroupSelectedUids.value = exists
+    ? chatGroupSelectedUids.value.filter((item) => item !== uid)
+    : [...chatGroupSelectedUids.value, uid];
+};
+
+const isChatGroupSelected = (uid) =>
+  chatGroupSelectedUids.value.includes(uid);
+
+const confirmChatGroupCreate = () => {
+  const ok = createGroupFromUids(chatGroupSelectedUids.value);
+  if (ok) {
+    closeChatGroupModal();
+  }
 };
 
 const handleDocumentClick = (event) => {
@@ -3323,10 +3284,63 @@ const filteredFriends = computed(() => {
   return [...pinned, ...rest];
 });
 
+const isGroupActive = computed(() => !!activeGroup.value?.id);
+
+const filteredGroups = computed(() => {
+  const query = searchText.value.trim().toLowerCase();
+  if (!query) return groups.value;
+  return groups.value.filter((group) => {
+    const name = (group.name || "").toLowerCase();
+    return name.includes(query);
+  });
+});
+
+const activeGroupMembers = computed(() => {
+  const group = activeGroup.value;
+  if (!group) return [];
+  const roleOrder = { owner: 0, admin: 1, member: 2 };
+  return group.members
+    .map((member) => {
+      const profile = resolveGroupMemberProfile(member.uid);
+      const name = profile.name || `UID ${member.uid}`;
+      return {
+        uid: member.uid,
+        role: member.role || "member",
+        roleLabel:
+          member.role === "owner"
+            ? "群主"
+            : member.role === "admin"
+              ? "管理员"
+              : "",
+        name,
+        avatar: profile.avatar,
+        initials: name.slice(0, 2).toUpperCase(),
+      };
+    })
+    .sort((a, b) => {
+      const roleDiff =
+        (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9);
+      if (roleDiff !== 0) return roleDiff;
+      return a.name.localeCompare(b.name, "zh-CN");
+    });
+});
+
+const groupMemberCount = computed(() => activeGroupMembers.value.length);
+
+const filteredGroupMembers = computed(() => {
+  const query = groupMemberQuery.value.trim().toLowerCase();
+  if (!query) return activeGroupMembers.value;
+  return activeGroupMembers.value.filter((member) => {
+    const name = (member.name || "").toLowerCase();
+    const uidText = String(member.uid || "");
+    return name.includes(query) || uidText.includes(query);
+  });
+});
+
 const canSend = computed(() => {
   return (
     !!auth.value.token &&
-    !!activeFriend.value?.uid &&
+    (!!activeFriend.value?.uid || !!activeGroup.value?.id) &&
     (draft.value.trim().length > 0 || draftImages.value.length > 0)
   );
 });
@@ -3654,6 +3668,15 @@ if (window.electronAPI?.onOpenChat) {
 }
 
 const displayMessages = computed(() => {
+  if (isGroupActive.value) {
+    const groupId = activeGroup.value?.id;
+    const items = groupId ? groupMessages.value[groupId] || [] : [];
+    return items.slice().sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+      return aTime - bTime;
+    });
+  }
   const targetUid = activeFriend.value?.uid;
   const localForTarget = targetUid
     ? localMessages.value.filter((item) => item.targetUid === targetUid)
@@ -4035,7 +4058,29 @@ const handleChatScroll = async () => {
   }
 };
 
+const selectGroup = async (group) => {
+  if (!group) return;
+  activeView.value = "chat";
+  activeGroup.value = group;
+  activeFriend.value = null;
+  isFriendProfileVisible.value = false;
+  isEditingGroupName.value = false;
+  isEditingGroupAnnouncement.value = false;
+  loading.value = false;
+  showRemoteMenu.value = false;
+  closeMorePanel();
+  showGroupMemberSearch.value = false;
+  groupMemberQuery.value = "";
+  await nextTick();
+  scheduleScrollToBottom();
+};
+
 const selectFriend = async (friend) => {
+  activeGroup.value = null;
+  isEditingGroupName.value = false;
+  isEditingGroupAnnouncement.value = false;
+  showGroupMemberSearch.value = false;
+  groupMemberQuery.value = "";
   activeFriend.value = friend;
   setUnreadCount(friend.uid, 0);
   clearUnread(friend?.uid);
@@ -4295,6 +4340,28 @@ const sendMessage = async () => {
   const hasText = content.length > 0;
   const hasImages = draftImages.value.length > 0;
   if (!hasText && !hasImages) return;
+  if (isGroupActive.value) {
+    if (hasImages) {
+      statusText.value = "群聊暂不支持发送图片";
+      return;
+    }
+    if (!hasText) return;
+    const groupId = activeGroup.value?.id;
+    if (!groupId) return;
+    draft.value = "";
+    const entry = {
+      id: `group-local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      type: "text",
+      senderUid: auth.value.uid,
+      groupId,
+      targetType: "group",
+      data: { content },
+      createdAt: new Date().toISOString(),
+    };
+    const next = [...(groupMessages.value[groupId] || []), entry];
+    groupMessages.value = { ...groupMessages.value, [groupId]: next };
+    return;
+  }
   if (hasImages) {
     const targetUid = activeFriend.value?.uid;
     const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -4429,6 +4496,83 @@ const scrollToBottom = () => {
   el.scrollTop = el.scrollHeight;
 };
 
+const updateGroupById = (groupId, patch) => {
+  if (!groupId) return;
+  groups.value = groups.value.map((group) =>
+    group.id === groupId ? { ...group, ...patch } : group,
+  );
+  if (activeGroup.value?.id === groupId) {
+    activeGroup.value = groups.value.find((group) => group.id === groupId) || null;
+  }
+};
+
+const startEditGroupName = () => {
+  if (!activeGroup.value) return;
+  groupNameDraft.value = activeGroup.value.name || "";
+  isEditingGroupName.value = true;
+  nextTick(() => {
+    groupNameInputRef.value?.focus?.();
+    groupNameInputRef.value?.select?.();
+  });
+};
+
+const commitGroupName = () => {
+  if (!activeGroup.value) return;
+  const nextName = groupNameDraft.value.trim();
+  if (nextName) {
+    updateGroupById(activeGroup.value.id, { name: nextName });
+  }
+  isEditingGroupName.value = false;
+};
+
+const cancelGroupNameEdit = () => {
+  isEditingGroupName.value = false;
+};
+
+const startEditGroupAnnouncement = () => {
+  if (!activeGroup.value) return;
+  groupAnnouncementDraft.value = activeGroup.value.announcement || "";
+  isEditingGroupAnnouncement.value = true;
+};
+
+const commitGroupAnnouncement = () => {
+  if (!activeGroup.value) return;
+  updateGroupById(activeGroup.value.id, {
+    announcement: groupAnnouncementDraft.value.trim(),
+  });
+  isEditingGroupAnnouncement.value = false;
+};
+
+const cancelGroupAnnouncementEdit = () => {
+  isEditingGroupAnnouncement.value = false;
+};
+
+const toggleGroupMemberSearch = () => {
+  showGroupMemberSearch.value = !showGroupMemberSearch.value;
+  if (!showGroupMemberSearch.value) {
+    groupMemberQuery.value = "";
+  }
+};
+
+const handleGroupAction = (type) => {
+  const labels = {
+    video: "视频通话",
+    screen: "屏幕分享",
+    invite: "邀请加群",
+    more: "更多功能",
+  };
+  statusText.value = `${labels[type] || "群聊功能"}待完善`;
+};
+
+const getMessageSenderName = (msg) => {
+  if (!msg) return "";
+  if (msg.senderUid === auth.value.uid) return displayName.value;
+  if (isGroupActive.value) {
+    return resolveGroupMemberProfile(msg.senderUid).name || `UID ${msg.senderUid}`;
+  }
+  return activeFriend.value?.username || `UID ${msg.senderUid || ""}`;
+};
+
 const toggleFriendProfile = () => {
   if (!activeFriend.value) return;
   if (!isFriendProfileVisible.value) {
@@ -4551,3008 +4695,3520 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .app-shell {
-  height: 100vh;
-  background: radial-gradient(
-    circle at top left,
-    #f5fbff,
-    #eef5ff 45%,
-    #e8f1ff
-  );
-  position: relative;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 280ms ease;
+    height: 100vh;
+    background: radial-gradient(circle at top left,
+            #f5fbff,
+            #eef5ff 45%,
+            #e8f1ff);
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 280ms ease;
 }
 
 .app-shell.app-enter {
-  opacity: 1;
+    opacity: 1;
 }
 
 .app-shell::before,
 .app-shell::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(0px);
-  opacity: 0.7;
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(0px);
+    opacity: 0.7;
 }
 
 .app-shell::before {
-  width: 380px;
-  height: 380px;
-  background: rgba(59, 213, 255, 0.18);
-  top: -120px;
-  right: -60px;
+    width: 380px;
+    height: 380px;
+    background: rgba(59, 213, 255, 0.18);
+    top: -120px;
+    right: -60px;
 }
 
 .app-shell::after {
-  width: 520px;
-  height: 520px;
-  background: rgba(72, 147, 214, 0.16);
-  bottom: -220px;
-  left: -120px;
+    width: 520px;
+    height: 520px;
+    background: rgba(72, 147, 214, 0.16);
+    bottom: -220px;
+    left: -120px;
 }
 
 .topbar {
-  height: var(--titlebar-h);
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 0 10px;
-  position: relative;
-  z-index: 2;
-  -webkit-app-region: drag;
-  user-select: none;
+    height: var(--titlebar-h);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 10px;
+    position: relative;
+    z-index: 2;
+    -webkit-app-region: drag;
+    user-select: none;
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow);
-  font-size: 16px;
+    width: 30px;
+    height: 30px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    box-shadow: var(--shadow);
+    font-size: 16px;
 }
 
 .brand-title {
-  font-weight: 700;
-  font-size: 14px;
+    font-weight: 700;
+    font-size: 14px;
 }
 
 .brand-sub {
-  font-size: 11px;
-  color: var(--ink-soft);
+    font-size: 11px;
+    color: var(--ink-soft);
 }
 
 .topbar-center {
-  display: flex;
-  justify-content: center;
-  user-select: none;
-  -webkit-app-region: drag;
+    display: flex;
+    justify-content: center;
+    user-select: none;
+    -webkit-app-region: drag;
 }
 
 .status-pill {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(72, 147, 214, 0.14);
-  color: #1d4ed8;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  user-select: none;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(72, 147, 214, 0.14);
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    user-select: none;
 }
 
 .topbar-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  user-select: none;
-  -webkit-app-region: drag;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    user-select: none;
+    -webkit-app-region: drag;
 }
 
 .topbar-right-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  -webkit-app-region: drag;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    -webkit-app-region: drag;
 }
 
 .topbar-right-spacer {
-  flex: 1;
-  height: 100%;
-  -webkit-app-region: drag;
+    flex: 1;
+    height: 100%;
+    -webkit-app-region: drag;
 }
 
 .user-card-wrap {
-  position: relative;
-  -webkit-app-region: no-drag;
-  user-select: none;
+    position: relative;
+    -webkit-app-region: no-drag;
+    user-select: none;
 }
 
 .user-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: 0 0 12px 12px;
-  background: var(--panel-soft);
-  border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 0 0 12px 12px;
+    background: var(--panel-soft);
+    border: 1px solid var(--line);
 }
 
 .user-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: #1f4c7a;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-  -webkit-app-region: no-drag;
-  overflow: hidden;
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    background: #1f4c7a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    display: grid;
+    place-items: center;
+    -webkit-app-region: no-drag;
+    overflow: hidden;
 }
 
 .user-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .user-meta {
-  display: grid;
-  gap: 2px;
+    display: grid;
+    gap: 2px;
 }
 
 .profile-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 320px;
-  height: auto;
-  background: linear-gradient(145deg, #ffffff, #f2f5fb);
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 18px 48px rgba(22, 32, 52, 0.16);
-  border: 1px solid rgba(31, 65, 120, 0.12);
-  opacity: 0;
-  transform: translateY(8px);
-  transition:
-    opacity 180ms ease,
-    transform 220ms ease;
-  pointer-events: none;
-  z-index: 20;
-  -webkit-app-region: no-drag;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 320px;
+    height: auto;
+    background: linear-gradient(145deg, #ffffff, #f2f5fb);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 18px 48px rgba(22, 32, 52, 0.16);
+    border: 1px solid rgba(31, 65, 120, 0.12);
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+        opacity 180ms ease,
+        transform 220ms ease;
+    pointer-events: none;
+    z-index: 20;
+    -webkit-app-region: no-drag;
 }
 
 .profile-popover.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .profile-head {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  margin-bottom: 8px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 8px;
 }
 
 .profile-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #1f4c7a;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 16px;
-  overflow: hidden;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 16px;
+    overflow: hidden;
 }
 
 .profile-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .profile-meta {
-  display: grid;
-  gap: 6px;
+    display: grid;
+    gap: 6px;
 }
 
 .profile-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1c2436;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1c2436;
 }
 
 .profile-uid {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: rgba(28, 36, 54, 0.6);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.6);
 }
 
 .profile-uid-copy {
-  border: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: rgba(28, 36, 54, 0.08);
-  color: rgba(28, 36, 54, 0.7);
-  font-size: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
+    border: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(28, 36, 54, 0.08);
+    color: rgba(28, 36, 54, 0.7);
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
 }
 
 .profile-uid-copy:hover {
-  background: rgba(28, 36, 54, 0.16);
+    background: rgba(28, 36, 54, 0.16);
 }
 
 .profile-signature {
-  font-size: 12px;
-  color: rgba(28, 36, 54, 0.7);
-  line-height: 1.4;
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.7);
+    line-height: 1.4;
 }
 
 .profile-details {
-  display: grid;
-  gap: 4px;
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(28, 36, 54, 0.65);
+    display: grid;
+    gap: 4px;
+    margin-top: 2px;
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.65);
 }
 
 input:focus::placeholder {
-  color: transparent;
+    color: transparent;
 }
 
 .profile-detail {
-  line-height: 1.4;
+    line-height: 1.4;
 }
 
 .profile-actions {
-  margin-top: auto;
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  padding-bottom: 8px;
-  -webkit-app-region: no-drag;
+    margin-top: auto;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding-bottom: 8px;
+    -webkit-app-region: no-drag;
 }
 
 .profile-btn {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 18px;
-  background: #1d4ed8;
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 18px;
+    background: #1d4ed8;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
 }
 
 .profile-btn.ghost {
-  background: rgba(29, 78, 216, 0.12);
-  color: #1d4ed8;
+    background: rgba(29, 78, 216, 0.12);
+    color: #1d4ed8;
 }
 
 .profile-btn.ghost:hover {
-  background: rgba(220, 38, 38, 0.16);
-  color: #dc2626;
+    background: rgba(220, 38, 38, 0.16);
+    color: #dc2626;
 }
 
 .profile-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: grid;
-  place-items: center;
-  opacity: 1;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    opacity: 1;
 }
 
 .profile-modal__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.18);
-  backdrop-filter: blur(6px);
-  transition:
-    opacity 140ms ease-out,
-    backdrop-filter 140ms ease-out;
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px);
+    transition:
+        opacity 140ms ease-out,
+        backdrop-filter 140ms ease-out;
 }
 
 .profile-modal__panel {
-  position: relative;
-  width: 520px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 64px);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(243, 248, 255, 0.98)
-  );
-  border-radius: 18px;
-  border: 1px solid rgba(72, 147, 214, 0.2);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
-  padding: 20px 22px 18px;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  -webkit-app-region: no-drag;
-  transform-origin: center;
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    opacity 200ms ease-out;
-  transition-delay: 80ms;
+    position: relative;
+    width: 520px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    background: linear-gradient(180deg,
+            rgba(255, 255, 255, 0.98),
+            rgba(243, 248, 255, 0.98));
+    border-radius: 18px;
+    border: 1px solid rgba(72, 147, 214, 0.2);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    padding: 20px 22px 18px;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    -webkit-app-region: no-drag;
+    transform-origin: center;
+    transition:
+        transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1),
+        opacity 200ms ease-out;
+    transition-delay: 80ms;
 }
 
 .profile-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
 }
 
 .profile-modal__title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1c2436;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1c2436;
 }
 
 .profile-modal__close {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-  color: #6b7280;
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6b7280;
 }
 
 .profile-modal__body {
-  display: grid;
-  gap: 12px;
-  overflow-y: auto;
-  padding-right: 6px;
-  flex: 1;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+    display: grid;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 6px;
+    flex: 1;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .profile-modal__avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: #1f4c7a;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 20px;
-  margin: 0 auto 6px;
-  overflow: hidden;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 20px;
+    margin: 0 auto 6px;
+    overflow: hidden;
 }
 
 .profile-modal__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .profile-modal__upload {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 6px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 6px;
 }
 
 .profile-modal__file {
-  display: none;
+    display: none;
 }
 
 .profile-field {
-  display: grid;
-  gap: 6px;
-  padding-left: 6px;
+    display: grid;
+    gap: 6px;
+    padding-left: 6px;
 }
 
 .profile-field__label {
-  font-size: 12px;
-  color: rgba(28, 36, 54, 0.65);
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.65);
 }
 
 .profile-field__control {
-  position: relative;
+    position: relative;
 }
 
 .profile-field__control input {
-  width: 100%;
+    width: 100%;
 }
 
 .profile-field__count {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  color: rgba(28, 36, 54, 0.5);
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: rgba(28, 36, 54, 0.5);
 }
 
 .profile-field select,
 .profile-field input[type="date"] {
-  width: 100%;
+    width: 100%;
 }
 
 .profile-modal input {
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #fff;
-  padding: 10px 12px;
-  font-size: 13px;
-  color: #1c2436;
-  font-family: inherit;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #fff;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #1c2436;
+    font-family: inherit;
 }
 
 .profile-field.is-invalid .profile-field__label {
-  color: #dc2626;
+    color: #dc2626;
 }
 
 .profile-field.is-invalid input {
-  border-color: rgba(220, 38, 38, 0.65);
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.65);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
 }
 
 .profile-modal input:focus,
 .profile-modal select:focus {
-  outline: none;
-  border-color: rgba(72, 147, 214, 0.5);
-  box-shadow: 0 0 0 3px rgba(72, 147, 214, 0.15);
+    outline: none;
+    border-color: rgba(72, 147, 214, 0.5);
+    box-shadow: 0 0 0 3px rgba(72, 147, 214, 0.15);
 }
 
 input:focus,
 textarea:focus,
 select:focus {
-  outline: none;
-  box-shadow: none;
+    outline: none;
+    box-shadow: none;
 }
 
 .profile-modal .select-menu {
-  box-shadow: none;
-  scrollbar-width: none;
+    box-shadow: none;
+    scrollbar-width: none;
 }
 
 .profile-modal .select-menu::-webkit-scrollbar {
-  display: none;
+    display: none;
 }
 
 .profile-field--split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
 
 .profile-modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 16px;
 }
 
 .crop-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2100;
-  display: grid;
-  place-items: center;
-  opacity: 1;
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: grid;
+    place-items: center;
+    opacity: 1;
 }
 
 .crop-modal__panel {
-  position: relative;
-  width: 420px;
-  max-width: calc(100vw - 32px);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(243, 248, 255, 0.98)
-  );
-  border-radius: 18px;
-  border: 1px solid rgba(72, 147, 214, 0.2);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
-  padding: 20px 22px 18px;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  -webkit-app-region: no-drag;
+    position: relative;
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    background: linear-gradient(180deg,
+            rgba(255, 255, 255, 0.98),
+            rgba(243, 248, 255, 0.98));
+    border-radius: 18px;
+    border: 1px solid rgba(72, 147, 214, 0.2);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    padding: 20px 22px 18px;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    -webkit-app-region: no-drag;
 }
 
 .crop-modal__body {
-  display: grid;
-  gap: 14px;
-  justify-items: center;
-  padding-bottom: 6px;
+    display: grid;
+    gap: 14px;
+    justify-items: center;
+    padding-bottom: 6px;
 }
 
 .crop-frame {
-  width: 240px;
-  height: 240px;
-  border-radius: 18px;
-  overflow: hidden;
-  background: rgba(15, 23, 42, 0.06);
-  position: relative;
-  cursor: grab;
-  user-select: none;
+    width: 240px;
+    height: 240px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.06);
+    position: relative;
+    cursor: grab;
+    user-select: none;
 }
 
 .crop-frame:active {
-  cursor: grabbing;
+    cursor: grabbing;
 }
 
 .crop-image {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform-origin: center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center;
 }
 
 .crop-controls {
-  width: 100%;
-  display: grid;
-  gap: 6px;
+    width: 100%;
+    display: grid;
+    gap: 6px;
 }
 
 .crop-zoom {
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-  color: rgba(28, 36, 54, 0.65);
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(28, 36, 54, 0.65);
 }
 
 .crop-zoom input[type="range"] {
-  width: 100%;
+    width: 100%;
 }
 
 .file-modal {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  z-index: 4000;
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 4000;
 }
 
 .file-modal__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(12px);
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(12px);
 }
 
 .file-modal__panel {
-  position: relative;
-  width: min(460px, 92vw);
-  border-radius: 18px;
-  background: #3a3a3a;
-  color: #f9fafb;
-  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  z-index: 1;
+    position: relative;
+    width: min(460px, 92vw);
+    border-radius: 18px;
+    background: #3a3a3a;
+    color: #f9fafb;
+    box-shadow: 0 24px 60px rgba(17, 24, 39, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 1;
 }
 
 .file-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    font-weight: 600;
 }
 
 .file-modal__title {
-  font-size: 16px;
+    font-size: 16px;
 }
 
 .file-modal__close {
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 20px;
-  cursor: pointer;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 20px;
+    cursor: pointer;
 }
 
 .file-modal__body {
-  padding: 6px 20px 18px;
+    padding: 6px 20px 18px;
 }
 
 .file-modal__card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .file-modal__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(37, 99, 235, 0.25);
-  color: #dbeafe;
-  display: grid;
-  place-items: center;
-  font-family: "Segoe MDL2 Assets";
-  font-size: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(37, 99, 235, 0.25);
+    color: #dbeafe;
+    display: grid;
+    place-items: center;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 18px;
 }
 
 .file-modal__meta {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
+    display: grid;
+    gap: 4px;
+    min-width: 0;
 }
 
 .file-modal__name {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .file-modal__size {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.65);
 }
 
 .file-modal__footer {
-  padding: 0 20px 18px;
+    padding: 0 20px 18px;
 }
 
 .file-modal__send {
-  width: 100%;
-  border: none;
-  border-radius: 14px;
-  padding: 12px 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  background: #0a6cff;
-  cursor: pointer;
-  box-shadow: 0 10px 20px rgba(10, 108, 255, 0.35);
+    width: 100%;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    background: #0a6cff;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(10, 108, 255, 0.35);
 }
 
 .file-modal__send:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .profile-modal-enter-active,
 .profile-modal-leave-active {
-  transition: opacity 160ms ease-out;
+    transition: opacity 160ms ease-out;
 }
 
 .profile-modal-enter-from,
 .profile-modal-leave-to {
-  opacity: 0;
+    opacity: 0;
 }
 
 .profile-modal-enter-from .profile-modal__panel,
 .profile-modal-leave-to .profile-modal__panel {
-  opacity: 0;
-  transform: translateY(10px) scale(0.98);
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
 }
 
 .profile-modal-leave-to .profile-modal__panel {
-  transition-delay: 0ms;
+    transition-delay: 0ms;
 }
 
 .profile-modal-enter-from .profile-modal__backdrop,
 .profile-modal-leave-to .profile-modal__backdrop {
-  opacity: 0;
-  backdrop-filter: blur(2px);
+    opacity: 0;
+    backdrop-filter: blur(2px);
 }
 
 .file-modal-enter-active,
 .file-modal-leave-active {
-  transition: opacity 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 
 .file-modal-enter-from,
 .file-modal-leave-to {
-  opacity: 0;
+    opacity: 0;
 }
 
 .file-modal-enter-from .file-modal__panel,
 .file-modal-leave-to .file-modal__panel {
-  transform: translateY(10px) scale(0.98);
+    transform: translateY(10px) scale(0.98);
 }
 
 .user-name {
-  font-size: 12px;
-  font-weight: 600;
+    font-size: 12px;
+    font-weight: 600;
 }
 
 .user-id {
-  font-size: 10px;
-  color: var(--ink-soft);
+    font-size: 10px;
+    color: var(--ink-soft);
 }
 
 .window-controls {
-  display: flex;
-  -webkit-app-region: no-drag;
-  user-select: none;
+    display: flex;
+    -webkit-app-region: no-drag;
+    user-select: none;
 }
 
 .wc-btn {
-  width: 40px;
-  height: 40px;
-  background: transparent;
-  border: none;
-  color: #6b7280;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.2s;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
 }
 
 .wc-btn:hover {
-  background: rgba(27, 28, 32, 0.08);
+    background: rgba(27, 28, 32, 0.08);
 }
 
 .wc-btn.close:hover {
-  background: #d04732;
-  color: #fff;
+    background: #d04732;
+    color: #fff;
 }
 
 .wc-icon {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 9px;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 9px;
 }
 
 .layout {
-  height: calc(100vh - var(--titlebar-h));
-  display: grid;
-  grid-template-columns: 70px 300px 1fr;
-  gap: 0px;
-  padding: 8px 2px 0px;
-  position: relative;
-  z-index: 1;
+    height: calc(100vh - var(--titlebar-h));
+    display: grid;
+    grid-template-columns: 70px 300px 1fr;
+    gap: 0px;
+    padding: 8px 2px 0px;
+    position: relative;
+    z-index: 1;
 }
 
 .icon-rail {
-  border-radius: 28px;
-  padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  -webkit-app-region: no-drag;
-  user-select: none;
-  max-height: 90vh;
+    border-radius: 28px;
+    padding: 16px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    -webkit-app-region: no-drag;
+    user-select: none;
+    max-height: 90vh;
 }
 
 .rail-section {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
 }
 
 .rail-bottom {
-  gap: 12px;
+    gap: 12px;
 }
 
 .rail-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.08);
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  color: #1f2937;
-  display: grid;
-  place-items: center;
-  position: relative;
-  cursor: pointer;
-  transition:
-    transform 0.2s var(--ease),
-    background 0.2s,
-    border 0.2s;
-  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.12);
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    color: #1f2937;
+    display: grid;
+    place-items: center;
+    position: relative;
+    cursor: pointer;
+    transition:
+        transform 0.2s var(--ease),
+        background 0.2s,
+        border 0.2s;
+    box-shadow: 0 4px 8px rgba(15, 23, 42, 0.12);
 }
 
 .rail-btn:hover {
-  transform: translateY(-2px);
-  background: rgba(15, 23, 42, 0.12);
-  border-color: rgba(15, 23, 42, 0.18);
+    transform: translateY(-2px);
+    background: rgba(15, 23, 42, 0.12);
+    border-color: rgba(15, 23, 42, 0.18);
 }
 
 .rail-btn.active {
-  background: #2b6cb0;
-  border-color: rgba(43, 108, 176, 0.4);
-  color: #fff;
-  box-shadow: 0 10px 18px rgba(25, 85, 160, 0.35);
+    background: #2b6cb0;
+    border-color: rgba(43, 108, 176, 0.4);
+    color: #fff;
+    box-shadow: 0 10px 18px rgba(25, 85, 160, 0.35);
 }
 
 .rail-icon {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 16px;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 16px;
 }
 
 .rail-dot {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff5a3c;
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff5a3c;
 }
 
 .rail-badge {
-  position: absolute;
-  right: -2px;
-  top: -6px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #ff5a3c;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  box-shadow: 0 6px 12px rgba(255, 90, 60, 0.35);
+    position: absolute;
+    right: -2px;
+    top: -6px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #ff5a3c;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    box-shadow: 0 6px 12px rgba(255, 90, 60, 0.35);
 }
 
 .sidebar {
-  background: var(--panel-soft);
-  border: 1px solid var(--line);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  box-shadow: var(--shadow);
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 260ms ease 60ms,
-    transform 320ms ease 60ms;
+    background: var(--panel-soft);
+    border: 1px solid var(--line);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+        opacity 260ms ease 60ms,
+        transform 320ms ease 60ms;
 }
 
 .chat-sidebar,
 .contacts-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  height: 85vh;
-  min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 85vh;
+    min-height: 0;
 }
 
 .contacts-search {
-  display: grid;
-  gap: 12px;
+    display: grid;
+    gap: 12px;
 }
 
 .contacts-search-box {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 16px;
-  padding: 0px 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  width: 270px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    padding: 0px 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    width: 270px;
 }
 
 .contacts-search-box input {
-  border: none;
-  background: transparent;
-  font-size: 13px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
 }
 
 .contacts-search-box input:focus {
-  outline: none;
+    outline: none;
 }
 
 .contacts-add-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  border: none;
-  background: rgba(43, 108, 176, 0.2);
-  color: #1d4ed8;
-  font-weight: 700;
-  cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(43, 108, 176, 0.2);
+    color: #1d4ed8;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 .friend-manager-btn {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(31, 41, 55, 0.08);
-  border-radius: 16px;
-  padding: 7px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #1f2937;
-  font-weight: 600;
-  cursor: pointer;
-  width: 270px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(31, 41, 55, 0.08);
+    border-radius: 16px;
+    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1f2937;
+    font-weight: 600;
+    cursor: pointer;
+    width: 270px;
 }
 
 .manager-icon {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 14px;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
 }
 
 .contacts-section {
-  display: grid;
-  gap: 10px;
+    display: grid;
+    gap: 10px;
 }
 
 .contacts-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: 14px;
-  background: transparent;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  font-weight: 600;
-  cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 14px;
+    background: transparent;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .contacts-item.active {
-  background: rgba(29, 78, 216, 0.16);
-  color: #1d4ed8;
+    background: rgba(29, 78, 216, 0.16);
+    color: #1d4ed8;
 }
 
 .contacts-item .badge {
-  background: #ff5a3c;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 999px;
-  margin-left: 140px;
+    background: #ff5a3c;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 999px;
+    margin-left: 140px;
 }
 
 .chev {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 12px;
-  color: #6b7280;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 12px;
+    color: #6b7280;
 }
 
 .contacts-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: rgba(17, 24, 39, 0.08);
-  border-radius: 14px;
-  padding: 1px;
-  gap: 6px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: rgba(17, 24, 39, 0.08);
+    border-radius: 14px;
+    padding: 1px;
+    gap: 6px;
 }
 
 .contacts-tab {
-  border: none;
-  background: transparent;
-  padding: 8px 0;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .contacts-tab.active {
-  background: #1d4ed8;
-  color: #fff;
+    background: #1d4ed8;
+    color: #fff;
 }
 
 .contacts-list {
-  display: grid;
-  gap: 5px;
-  overflow-y: auto;
-  padding-right: 4px;
-  flex: 1;
-  min-height: 0;
+    display: grid;
+    gap: 5px;
+    overflow-y: auto;
+    padding-right: 4px;
+    flex: 1;
+    min-height: 0;
 }
 
 .contacts-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  cursor: pointer;
-  font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    cursor: pointer;
+    font-weight: 600;
 }
 
 .contacts-row .count {
-  color: #6b7280;
-  font-weight: 600;
+    color: #6b7280;
+    font-weight: 600;
 }
 
 .contacts-group {
-  display: grid;
-  gap: 8px;
+    display: grid;
+    gap: 8px;
 }
 
 .contacts-group-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .contacts-group-header .chev {
-  transition: transform 0.2s ease;
-  transform: rotate(0deg);
+    transition: transform 0.2s ease;
+    transform: rotate(0deg);
 }
 
 .contacts-group-header .chev.open {
-  transform: rotate(90deg);
+    transform: rotate(90deg);
 }
 
 .contacts-group-items {
-  display: grid;
-  gap: 6px;
-  padding: 0 6px 6px 6px;
+    display: grid;
+    gap: 6px;
+    padding: 0 6px 6px 6px;
 }
 
 .contacts-friend {
-  display: grid;
-  grid-template-columns: 32px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
-  cursor: pointer;
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    cursor: pointer;
 }
 
 .contacts-friend-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: #1f4c7a;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    background: #1f4c7a;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
 }
 
 .contacts-friend-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .contacts-friend-name {
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .contacts-friend-uid {
-  color: #6b7280;
+    color: #6b7280;
 }
 
 .contacts-empty {
-  font-size: 12px;
-  color: #9ca3af;
-  padding: 6px 10px 10px;
+    font-size: 12px;
+    color: #9ca3af;
+    padding: 6px 10px 10px;
 }
 
 .search {
-  display: grid;
-  gap: 8px;
+    display: grid;
+    gap: 8px;
 }
 
 .search-icon {
-  color: #64748b;
-  font-size: 14px;
+    color: #64748b;
+    font-size: 14px;
 }
 
 .search-hint {
-  font-size: 11px;
-  color: var(--ink-soft);
-  text-align: right;
-  user-select: none;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+    user-select: none;
 }
 
 .list {
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  user-select: none;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    user-select: none;
 }
 
 .section-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  height: 4vh;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    height: 4vh;
 }
 
 .list-item {
-  display: grid;
-  grid-template-columns: 42px 1fr auto;
-  gap: 12px;
-  align-items: center;
-  text-align: left;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  padding: 10px;
-  background: #fff;
-  transition:
-    transform 0.2s var(--ease),
-    border 0.2s;
-  cursor: pointer;
-  width: 100%;
-  height: 70px;
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    text-align: left;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    padding: 10px;
+    background: #fff;
+    transition:
+        transform 0.2s var(--ease),
+        border 0.2s;
+    cursor: pointer;
+    width: 100%;
+    height: 70px;
 }
 
 .list-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(72, 147, 214, 0.5);
+    transform: translateY(-2px);
+    border-color: rgba(72, 147, 214, 0.5);
 }
 
 .list-item.active {
-  border-color: rgba(72, 147, 214, 0.6);
-  box-shadow: 0 12px 20px rgba(72, 147, 214, 0.18);
+    border-color: rgba(72, 147, 214, 0.6);
+    box-shadow: 0 12px 20px rgba(72, 147, 214, 0.18);
 }
 
 .list-item.pinned {
-  background: rgba(31, 76, 122, 0.08);
-  border-color: rgba(31, 76, 122, 0.2);
+    background: rgba(31, 76, 122, 0.08);
+    border-color: rgba(31, 76, 122, 0.2);
 }
 
 .avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: #1f4c7a;
-  color: #fff;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  overflow: hidden;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #1f4c7a;
+    color: #fff;
+    font-weight: 600;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    overflow: hidden;
 }
 
 .avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .list-meta {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
+    display: grid;
+    gap: 4px;
+    min-width: 0;
 }
 
 .list-name {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .list-sub {
-  font-size: 12px;
-  color: var(--ink-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .list-badge {
-  min-width: 22px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: #ff5a3c;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 12px rgba(255, 90, 60, 0.25);
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ff5a3c;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 12px rgba(255, 90, 60, 0.25);
 }
 
 .list-badges {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .list-badge.mute {
-  background: rgba(15, 23, 42, 0.08);
-  color: #334155;
+    background: rgba(15, 23, 42, 0.08);
+    color: #334155;
 }
 
 .list-unread-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #ef4444;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #ef4444;
 }
 
 .list-context-menu {
-  position: fixed;
-  z-index: 3000;
-  width: 180px;
-  padding: 10px;
-  border-radius: 14px;
-  background: transparent;
-  border: 1px solid rgba(72, 147, 214, 0.2);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
-  display: grid;
-  gap: 1px;
-  background-color: white;
+    position: fixed;
+    z-index: 3000;
+    width: 180px;
+    padding: 10px;
+    border-radius: 14px;
+    background: transparent;
+    border: 1px solid rgba(72, 147, 214, 0.2);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    display: grid;
+    gap: 1px;
+    background-color: white;
 }
 
 .list-context-item {
-  border: none;
-  border-radius: 10px;
-  padding: 9px 12px;
-  background: transparent;
-  color: #1e3a8a;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 12px;
+    background: transparent;
+    color: #1e3a8a;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
 }
 
 .list-context-item:hover {
-  background: #e5e7eb;
-  color: #111827;
+    background: #e5e7eb;
+    color: #111827;
 }
 
 .list-context-item.danger {
-  color: #b91c1c;
+    color: #b91c1c;
 }
 
 .list-context-item.danger:hover {
-  background: #e5e7eb;
-  color: #991b1b;
+    background: #e5e7eb;
+    color: #991b1b;
 }
 
 .empty-state {
-  font-size: 12px;
-  color: var(--ink-soft);
-  text-align: center;
-  padding: 20px 0;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: center;
+    padding: 20px 0;
 }
 
 .chat {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  box-shadow: var(--shadow);
-  opacity: 0;
-  transform: translateY(8px);
-  transition:
-    opacity 280ms ease 120ms,
-    transform 360ms ease 120ms;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+        opacity 280ms ease 120ms,
+        transform 360ms ease 120ms;
+}
+
+.chat-shell {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.chat-shell.with-group {
+    gap: 0;
+    padding-right: 0;
+}
+
+.chat-stack {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .chat-panel,
 .contacts-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
 }
 
 .contacts-header {
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .contacts-title {
-  font-size: 20px;
-  font-weight: 700;
+    font-size: 20px;
+    font-weight: 700;
 }
 
 .contacts-tools {
-  display: flex;
-  gap: 12px;
+    display: flex;
+    gap: 12px;
 }
 
 .tool-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(15, 23, 42, 0.08);
-  cursor: pointer;
-  position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    border: none;
+    background: rgba(15, 23, 42, 0.08);
+    cursor: pointer;
+    position: relative;
 }
 
 .tool-icon {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 14px;
-  color: #1f2937;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
+    color: #1f2937;
 }
 
 .tool-dot {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff5a3c;
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff5a3c;
 }
 
 .contacts-body {
-  padding: 20px 24px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-  min-height: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(243, 248, 255, 0.9),
-    rgba(255, 255, 255, 0.95)
-  );
+    padding: 20px 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    background: linear-gradient(180deg,
+            rgba(243, 248, 255, 0.9),
+            rgba(255, 255, 255, 0.95));
 }
 
 .contact-profile {
-  display: grid;
-  gap: 12px;
+    display: grid;
+    gap: 12px;
 }
 
 .contact-profile-card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 18px;
-  border: 1px solid rgba(72, 147, 214, 0.18);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 18px;
+    border: 1px solid rgba(72, 147, 214, 0.18);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
 .contact-profile-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
 }
 
 .contact-profile-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
 }
 
 .contact-action-btn {
-  height: 34px;
-  padding: 0 16px;
-  border-radius: 16px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #111827;
-  font-size: 13px;
-  font-weight: 600;
-  transition:
-    background 0.2s,
-    border 0.2s,
-    color 0.2s,
-    transform 0.2s;
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 16px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 600;
+    transition:
+        background 0.2s,
+        border 0.2s,
+        color 0.2s,
+        transform 0.2s;
 }
 
 .contact-action-btn:hover {
-  transform: translateY(-1px);
-  background: #f3f4f6;
+    transform: translateY(-1px);
+    background: #f3f4f6;
 }
 
 .contact-action-btn.primary {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #ffffff;
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #ffffff;
 }
 
 .contact-action-btn.primary:hover {
-  background: #1e40af;
+    background: #1e40af;
 }
 
 .contact-action-icon {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 14px;
-  line-height: 1;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
+    line-height: 1;
 }
 
 .contact-action-text {
-  line-height: 1;
+    line-height: 1;
 }
 
 .contact-tag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
 }
 
 .contact-tag.offline {
-  background: rgba(148, 163, 184, 0.2);
-  color: #64748b;
+    background: rgba(148, 163, 184, 0.2);
+    color: #64748b;
 }
 
 .notify-list {
-  display: grid;
-  gap: 16px;
+    display: grid;
+    gap: 16px;
 }
 
 .notify-card {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: #ffffff;
-  border: 1px solid rgba(72, 147, 214, 0.18);
-  color: #1f2937;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid rgba(72, 147, 214, 0.18);
+    color: #1f2937;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
 .notify-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #1f4c7a;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 600;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
 }
 
 .notify-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .notify-main {
-  display: grid;
-  gap: 6px;
+    display: grid;
+    gap: 6px;
 }
 
 .notify-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
 }
 
 .notify-name {
-  color: #2563eb;
+    color: #2563eb;
 }
 
 .notify-text {
-  color: #1f2937;
+    color: #1f2937;
 }
 
 .notify-sub {
-  font-size: 12px;
-  color: #6b7280;
+    font-size: 12px;
+    color: #6b7280;
 }
 
 .notify-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .notify-accept,
 .notify-reject {
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(15, 23, 42, 0.06);
-  color: #1f2937;
-  padding: 6px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(15, 23, 42, 0.06);
+    color: #1f2937;
+    padding: 6px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
 }
 
 .notify-accept {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
 }
 
 .notify-status {
-  font-size: 12px;
-  font-weight: 600;
-  color: #9ca3af;
+    font-size: 12px;
+    font-weight: 600;
+    color: #9ca3af;
 }
 
 .notify-status.status-rejected {
-  color: #f87171;
+    color: #f87171;
 }
 
 .chat-header {
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: relative;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
 }
 
 .app-shell.app-enter .sidebar,
 .app-shell.app-enter .chat {
-  opacity: 1;
-  transform: translateY(0);
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .chat-title {
-  font-size: 18px;
-  font-weight: 700;
-  user-select: none;
+    font-size: 18px;
+    font-weight: 700;
+    user-select: none;
+}
+
+.chat-title.group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.group-title-text {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.group-title-input {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 16px;
+    font-weight: 700;
+    width: min(320px, 60vw);
 }
 
 .chat-title.clickable {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 .chat-title.clickable:hover {
-  color: #1d4ed8;
+    color: #1d4ed8;
 }
 
 .chat-sub {
-  font-size: 12px;
-  color: var(--ink-soft);
-  user-select: none;
+    font-size: 12px;
+    color: var(--ink-soft);
+    user-select: none;
 }
 
 .chat-actions {
-  display: flex;
-  gap: 8px;
-  user-select: none;
-  -webkit-app-region: drag;
+    display: flex;
+    gap: 8px;
+    user-select: none;
+    -webkit-app-region: drag;
 }
 
 .chat-actions-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  -webkit-app-region: no-drag;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-app-region: no-drag;
 }
 
 .chat-action-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #ffffff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: #374151;
-  transition:
-    background 0.2s,
-    border 0.2s,
-    color 0.2s;
-  -webkit-app-region: no-drag;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: #374151;
+    transition:
+        background 0.2s,
+        border 0.2s,
+        color 0.2s;
+    -webkit-app-region: no-drag;
 }
 
 .chat-action-btn:hover {
-  background: rgba(15, 23, 42, 0.06);
-  color: #111827;
+    background: rgba(15, 23, 42, 0.06);
+    color: #111827;
 }
 
 .chat-action-icon {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 14px;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
 }
 
 .chat-action-remote {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  -webkit-app-region: no-drag;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    -webkit-app-region: no-drag;
 }
 
 .chat-action-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: -20px;
-  min-width: 180px;
-  background: #ffffff;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  box-shadow: 0 16px 24px rgba(15, 23, 42, 0.14);
-  padding: 6px;
-  display: grid;
-  gap: 4px;
-  opacity: 0;
-  transform: translateY(4px);
-  pointer-events: none;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-  z-index: 6;
-  -webkit-app-region: no-drag;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: -20px;
+    min-width: 180px;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 16px 24px rgba(15, 23, 42, 0.14);
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+    z-index: 6;
+    -webkit-app-region: no-drag;
 }
 
 .chat-action-menu.open {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .chat-action-menu-item {
-  border: none;
-  background: transparent;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  color: #1f2937;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #1f2937;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
 }
 
 .chat-action-menu-item:hover {
-  background: rgba(15, 23, 42, 0.06);
+    background: rgba(15, 23, 42, 0.06);
 }
 
 .chip {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(72, 147, 214, 0.16);
-  color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(72, 147, 214, 0.16);
+    color: #1d4ed8;
 }
 
 .chip.offline {
-  background: rgba(148, 163, 184, 0.2);
-  color: #64748b;
+    background: rgba(148, 163, 184, 0.2);
+    color: #64748b;
 }
 
 .friend-profile-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 22px;
-  width: 320px;
-  background: linear-gradient(145deg, #ffffff, #f2f5fb);
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 18px 48px rgba(22, 32, 52, 0.16);
-  border: 1px solid rgba(31, 65, 120, 0.12);
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 180ms ease,
-    transform 220ms ease;
-  pointer-events: none;
-  z-index: 5;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 22px;
+    width: 320px;
+    background: linear-gradient(145deg, #ffffff, #f2f5fb);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 18px 48px rgba(22, 32, 52, 0.16);
+    border: 1px solid rgba(31, 65, 120, 0.12);
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+        opacity 180ms ease,
+        transform 220ms ease;
+    pointer-events: none;
+    z-index: 5;
 }
 
 .friend-profile-popover.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .chat-body {
-  padding: 20px 24px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-  min-height: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(243, 248, 255, 0.8),
-    rgba(255, 255, 255, 0.95)
-  );
+    padding: 20px 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    background: linear-gradient(180deg,
+            rgba(243, 248, 255, 0.8),
+            rgba(255, 255, 255, 0.95));
 }
 
 .chat-block-notice {
-  align-self: center;
-  background: #f3f4f6;
-  color: #9ca3af;
-  font-size: 12px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  text-align: center;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+    align-self: center;
+    background: #f3f4f6;
+    color: #9ca3af;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    text-align: center;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
 }
 
 .bubble-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .bubble {
-  max-width: 50%;
-  width: fit-content;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: #f3f7ff;
-  box-shadow: 0 8px 18px rgba(27, 28, 32, 0.08);
-  display: grid;
-  gap: 6px;
-  position: relative;
+    max-width: 50%;
+    width: fit-content;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: #f3f7ff;
+    box-shadow: 0 8px 18px rgba(27, 28, 32, 0.08);
+    display: grid;
+    gap: 6px;
+    position: relative;
 }
 
 .bubble.image-only {
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .bubble.file-only {
-  padding: 0;
-  background: unset !important;
-  box-shadow: none;
-  color: inherit !important;
+    padding: 0;
+    background: unset !important;
+    box-shadow: none;
+    color: inherit !important;
 }
 
 .bubble.self {
-  align-self: flex-end;
-  background: #2b6cb0;
-  color: #fff;
+    align-self: flex-end;
+    background: #2b6cb0;
+    color: #fff;
 }
 
 .bubble.image-only.self {
-  background: transparent;
-  color: inherit;
+    background: transparent;
+    color: inherit;
 }
 
 .bubble.error {
-  border: 1px solid rgba(255, 90, 60, 0.4);
+    border: 1px solid rgba(255, 90, 60, 0.4);
 }
 
 .bubble-error-dot {
-  position: absolute;
-  left: -8px;
-  top: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff5a3c;
-  box-shadow: 0 0 0 3px rgba(255, 90, 60, 0.2);
+    position: absolute;
+    left: -8px;
+    top: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff5a3c;
+    box-shadow: 0 0 0 3px rgba(255, 90, 60, 0.2);
 }
 
 .bubble-name {
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0.7;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.7;
 }
 
 .bubble-text {
-  font-size: 14px;
-  line-height: 1.5;
-  font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  white-space: pre-wrap;
-  word-break: break-word;
+    font-size: 14px;
+    line-height: 1.5;
+    font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .bubble-image {
-  max-width: 90%;
-  max-height: 24vh;
-  border-radius: 12px;
-  display: block;
+    max-width: 90%;
+    max-height: 24vh;
+    border-radius: 12px;
+    display: block;
 }
 
 .bubble-file {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(30, 30, 30, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  box-shadow: 4px 8px 8px 4px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(30, 30, 30, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    box-shadow: 4px 8px 8px 4px rgba(0, 0, 0, 0.15);
 }
 
 .bubble.self .bubble-file {
-  width: 200px;
-  height: 80px;
-  background: rgba(30, 30, 30, 0.6);
-  border-color: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
+    width: 200px;
+    height: 80px;
+    background: rgba(30, 30, 30, 0.6);
+    border-color: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
 }
 
 .bubble-file-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(59, 130, 246, 0.15);
-  color: #1d4ed8;
-  display: grid;
-  place-items: center;
-  font-family: "Segoe MDL2 Assets";
-  font-size: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(59, 130, 246, 0.15);
+    color: #1d4ed8;
+    display: grid;
+    place-items: center;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 16px;
 }
 
 .bubble.self .bubble-file-icon {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
 }
 
 .bubble-file-meta {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
 }
 
 .bubble-file-name {
-  font-weight: 600;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: white !important;
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: white !important;
 }
 
 .bubble-file-size,
 .bubble-file-status {
-  font-size: 11px;
-  color: #6b7280;
+    font-size: 11px;
+    color: #6b7280;
 }
 
 .bubble.self .bubble-file-size,
 .bubble.self .bubble-file-status {
-  color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .bubble-file-link {
-  font-size: 12px;
-  font-weight: 600;
-  color: #2563eb;
-  text-decoration: none;
-  border: none;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2563eb;
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
 }
 
 .bubble-file-expired {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .bubble.self .bubble-file-link {
-  color: #ffffff;
+    color: #ffffff;
 }
 
 .bubble-image-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .bubble-caption {
-  margin-top: 8px;
+    margin-top: 8px;
 }
 
 .card-message {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  color: #111827;
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    color: #111827;
 }
 
 .card-title {
-  font-size: 11px;
-  color: #9ca3af;
+    font-size: 11px;
+    color: #9ca3af;
 }
 
 .card-main {
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 10px;
-  align-items: center;
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 10px;
+    align-items: center;
 }
 
 .card-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: #1f4c7a;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  overflow: hidden;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    overflow: hidden;
 }
 
 .card-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .card-meta {
-  display: grid;
-  gap: 4px;
+    display: grid;
+    gap: 4px;
 }
 
 .card-name {
-  font-size: 13px;
-  font-weight: 600;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .card-uid {
-  font-size: 11px;
-  color: #6b7280;
+    font-size: 11px;
+    color: #6b7280;
 }
 
 .card-note {
-  font-size: 12px;
-  color: #6b7280;
-  line-height: 1.4;
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
 }
 
 .serach_input_box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    user-select: none;
 }
 
 .bubble-time {
-  font-size: 10px;
-  opacity: 0.6;
-  text-align: right;
+    font-size: 10px;
+    opacity: 0.6;
+    text-align: right;
+}
+
+.group-chat-body {
+    background: #f7f7f7;
+}
+
+.group-chat-body .bubble {
+    max-width: 46%;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: #ffffff;
+    color: #111827;
+    box-shadow: none;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.group-chat-body .bubble.self {
+    background: #95ec69;
+    color: #111827;
+    border-color: rgba(0, 0, 0, 0.04);
+}
+
+.group-chat-body .bubble.image-only,
+.group-chat-body .bubble.file-only {
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+.group-chat-body .bubble-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: #8b8b8b;
+    opacity: 1;
+}
+
+.group-chat-body .bubble-time {
+    font-size: 10px;
+    color: #a3a3a3;
+    opacity: 1;
+    text-align: right;
 }
 
 .bubble-pending-spinner {
-  position: absolute;
-  left: -22px;
-  bottom: 10px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: rgba(255, 255, 255, 0.9);
-  animation: bubble-spin 0.9s linear infinite;
+    position: absolute;
+    left: -22px;
+    bottom: 10px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: rgba(255, 255, 255, 0.9);
+    animation: bubble-spin 0.9s linear infinite;
 }
 
 @keyframes bubble-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .composer {
-  padding: 16px 22px 18px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 0px;
-  flex: 0 0 auto;
-  max-height: 360px;
-  overflow: hidden;
-  overscroll-behavior: contain;
-  position: relative;
-  z-index: 2;
+    padding: 16px 22px 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+    flex: 0 0 auto;
+    max-height: 360px;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    position: relative;
+    z-index: 2;
 }
 
 .composer-resize-handle {
-  position: absolute;
-  top: -6px;
-  left: 0;
-  right: 0;
-  height: 12px;
-  cursor: row-resize;
-  z-index: 3;
+    position: absolute;
+    top: -6px;
+    left: 0;
+    right: 0;
+    height: 12px;
+    cursor: row-resize;
+    z-index: 3;
 }
 
 .composer-resize-handle::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 5px;
-  width: 44px;
-  height: 3px;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 5px;
+    width: 44px;
+    height: 3px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .composer-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 4px 2px;
-  position: relative;
-  user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px 2px;
+    position: relative;
+    user-select: none;
 }
 
 .tool-icon-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #4b5563;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition:
-    background 0.2s,
-    border 0.2s,
-    color 0.2s;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #4b5563;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition:
+        background 0.2s,
+        border 0.2s,
+        color 0.2s;
 }
 
 .tool-icon-btn:hover {
-  background: rgba(15, 23, 42, 0.06);
-  border-color: rgba(15, 23, 42, 0.12);
-  color: #1f2937;
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: #1f2937;
 }
 
 .tool-icon-btn.is-active {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.3);
-  color: #1d4ed8;
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: #1d4ed8;
+}
+
+.tool-icon-btn.is-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .chat-side-overlay {
-  position: fixed;
-  inset: 0;
-  background: transparent;
-  z-index: 18;
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 18;
 }
 
 .chat-side-panel {
-  position: fixed;
-  top: 70px;
-  right: 0px;
-  width: 260px;
-  max-height: calc(100vh - 0px);
-  overflow-y: auto;
-  display: grid;
-  gap: 38px;
-  padding: 8px;
-  opacity: 0;
-  transform: translateX(12px);
-  pointer-events: none;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-  z-index: 19;
-  background-color: #f2f2f2;
-  box-shadow: -4px 10px 10px 2px #cccccc;
-  border-radius: 10px;
+    position: fixed;
+    top: 70px;
+    right: 0px;
+    width: 260px;
+    max-height: calc(100vh - 0px);
+    overflow-y: auto;
+    display: grid;
+    gap: 38px;
+    padding: 8px;
+    opacity: 0;
+    transform: translateX(12px);
+    pointer-events: none;
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+    z-index: 19;
+    background-color: #f2f2f2;
+    box-shadow: -4px 10px 10px 2px #cccccc;
+    border-radius: 10px;
 }
 
 .chat-side-panel.open {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
 }
 
 .chat-side-card {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 12px;
-  display: grid;
-  gap: 10px;
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
 }
 
 .chat-side-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #111827;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #111827;
 }
 
 .chat-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  width: 40px;
-  height: 22px;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 40px;
+    height: 22px;
 }
 
 .chat-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+    opacity: 0;
+    width: 0;
+    height: 0;
 }
 
 .chat-switch-slider {
-  position: absolute;
-  inset: 0;
-  background: #e5e7eb;
-  border-radius: 999px;
-  transition: background 0.2s ease;
+    position: absolute;
+    inset: 0;
+    background: #e5e7eb;
+    border-radius: 999px;
+    transition: background 0.2s ease;
 }
 
 .chat-switch-slider::before {
-  content: "";
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  left: 2px;
-  top: 2px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
-  transition: transform 0.2s ease;
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 2px;
+    top: 2px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+    transition: transform 0.2s ease;
 }
 
-.chat-switch input:checked + .chat-switch-slider {
-  background: #60a5fa;
+.chat-switch input:checked+.chat-switch-slider {
+    background: #60a5fa;
 }
 
-.chat-switch input:checked + .chat-switch-slider::before {
-  transform: translateX(18px);
+.chat-switch input:checked+.chat-switch-slider::before {
+    transform: translateX(18px);
 }
 
 .chat-side-action {
-  width: 100%;
-  border: none;
-  background: #ffffff;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 13px;
-  color: #111827;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+    width: 100%;
+    border: none;
+    background: #ffffff;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .chat-side-action:hover {
-  background: #f3f4f6;
+    background: #f3f4f6;
 }
 
 .chat-side-chev {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 12px;
-  color: #9ca3af;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 12px;
+    color: #9ca3af;
 }
 
 .chat-side-danger {
-  width: 100%;
-  border: none;
-  background: #fff5f5;
-  color: #ef4444;
-  font-weight: 600;
-  padding: 10px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+    width: 100%;
+    border: none;
+    background: #fff5f5;
+    color: #ef4444;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .chat-side-danger:hover {
-  background: #fee2e2;
+    background: #fee2e2;
 }
 
 .chat-side-link {
-  border: none;
-  background: transparent;
-  color: #2563eb;
-  font-size: 12px;
-  cursor: pointer;
-  text-align: center;
-  padding: 6px 0;
+    border: none;
+    background: transparent;
+    color: #2563eb;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    padding: 6px 0;
+}
+
+.group-item .group-avatar {
+    background: #1f4c7a;
+    color: #fff;
+}
+
+.group-panel {
+    width: 260px;
+    min-width: 240px;
+    max-width: 300px;
+    padding: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: #ffffff;
+    border-left: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.group-panel-card {
+    background: transparent;
+    border-radius: 0;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: none;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.group-panel-card:last-child {
+    border-bottom: none;
+}
+
+.group-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.group-panel-add {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.group-panel-text {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.6;
+    min-height: 40px;
+}
+
+.group-panel-editor textarea {
+    width: 100%;
+    min-height: 70px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    padding: 8px 10px;
+    resize: none;
+    font-size: 12px;
+}
+
+.group-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.group-panel-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 6px 14px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.group-panel-btn.ghost {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.group-member-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.group-member-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.group-member-count {
+    font-size: 12px;
+    color: #111827;
+    opacity: 0.8;
+}
+
+.group-member-search-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+}
+
+.group-member-search-btn:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+
+.group-member-search input {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.group-member-list {
+    display: grid;
+    gap: 8px;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.group-member {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.group-member-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-size: 12px;
+    color: #111827;
+}
+
+.group-member-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.group-member-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.group-member-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.group-member-role {
+    font-size: 11px;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+    padding: 2px 6px;
+    border-radius: 999px;
+}
+
+.group-member-role.role-admin {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.12);
+}
+
+.group-member-role.role-member {
+    color: #6b7280;
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.group-member-empty {
+    font-size: 12px;
+    color: #9ca3af;
+    padding: 8px 0;
+    text-align: center;
+}
+
+@media (max-width: 1200px) {
+    .chat-shell.with-group {
+        flex-direction: column;
+        padding-right: 0;
+    }
+
+    .group-panel {
+        width: 100%;
+        max-width: none;
+        border-left: none;
+        border-top: 1px solid var(--line);
+    }
 }
 
 .tool-glyph {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 16px;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 16px;
 }
 
 .emoji-panel {
-  position: fixed;
-  width: 360px;
-  background: linear-gradient(180deg, #f9fcff 0%, #ffffff 100%);
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
-  padding: 12px;
-  z-index: 50;
+    position: fixed;
+    width: 360px;
+    background: linear-gradient(180deg, #f9fcff 0%, #ffffff 100%);
+    border-radius: 18px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+    padding: 12px;
+    z-index: 50;
 }
 
 .emoji-tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
 }
 
 .emoji-tab {
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 6px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  cursor: pointer;
-  color: #334155;
-  font-weight: 600;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #334155;
+    font-weight: 600;
 }
 
 .emoji-tab.active {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.28);
-  color: #1d4ed8;
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.28);
+    color: #1d4ed8;
 }
 
 .emoji-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding-right: 4px;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .emoji-btn {
-  width: 36px;
-  height: 34px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  transition: background 0.2s;
+    width: 36px;
+    height: 34px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    transition: background 0.2s;
 }
 
 .emoji-btn:hover {
-  background: rgba(15, 23, 42, 0.08);
+    background: rgba(15, 23, 42, 0.08);
 }
 
 .emoji-empty {
-  font-size: 12px;
-  color: rgba(15, 23, 42, 0.5);
-  padding: 16px 0;
-  text-align: center;
+    font-size: 12px;
+    color: rgba(15, 23, 42, 0.5);
+    padding: 16px 0;
+    text-align: center;
 }
 
 .tool-spacer {
-  flex: 1;
+    flex: 1;
 }
 
 .composer-body {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
 }
 
 .composer-input {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  flex-direction: column;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    flex-direction: column;
 }
 
 .composer-image-list {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  max-width: 80%;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    max-width: 80%;
 }
 
 .composer textarea {
-  min-height: 70px;
-  resize: none;
-  font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  border-radius: 12px;
-  border: unset;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.9);
-  outline: none;
-  flex: 1;
+    min-height: 70px;
+    resize: none;
+    font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    border-radius: 12px;
+    border: unset;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.9);
+    outline: none;
+    flex: 1;
 }
 
 .composer textarea::-webkit-scrollbar {
-  display: none;
+    display: none;
 }
 
 .composer textarea:focus {
-  box-shadow: unset;
+    box-shadow: unset;
 }
 
 .composer-image-input {
-  display: none;
+    display: none;
 }
 
 .composer-file-input {
-  display: none;
+    display: none;
 }
 
 .composer-image-preview {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #fff;
+    position: relative;
+    width: 96px;
+    height: 96px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #fff;
 }
 
 .composer-image-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .composer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
 }
 
 .send-tip-mark {
-  font-family: "Segoe MDL2 Assets";
-  font-size: 14px;
-  color: #1d4ed8;
+    font-family: "Segoe MDL2 Assets";
+    font-size: 14px;
+    color: #1d4ed8;
 }
 
 .send-group {
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-radius: 14px;
-  overflow: visible;
-  box-shadow: 0 10px 18px rgba(72, 147, 214, 0.25);
-  position: relative;
-  user-select: none;
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 14px;
+    overflow: visible;
+    box-shadow: 0 10px 18px rgba(72, 147, 214, 0.25);
+    position: relative;
+    user-select: none;
 }
 
 .send-btn {
-  border: none;
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s var(--ease);
-  padding: 10px 22px;
-  background: transparent;
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease);
+    padding: 10px 22px;
+    background: transparent;
 }
 
 .send-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .send-btn:not(:disabled):hover {
-  transform: translateY(-2px);
+    transform: translateY(-2px);
 }
 
 .send-drop {
-  width: 36px;
-  height: 100%;
-  border: none;
-  background: unset;
-  color: #fff;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
+    width: 36px;
+    height: 100%;
+    border: none;
+    background: unset;
+    color: #fff;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
 }
 
 .send-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 10px);
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.16);
-  padding: 8px 10px;
-  display: grid;
-  gap: 6px;
-  min-width: 220px;
-  z-index: 5;
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 18px 30px rgba(15, 23, 42, 0.16);
+    padding: 8px 10px;
+    display: grid;
+    gap: 6px;
+    min-width: 220px;
+    z-index: 5;
 }
 
 .send-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: #374151;
-  padding: 6px 8px;
-  border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #374151;
+    padding: 6px 8px;
+    border-radius: 8px;
 }
 
 .send-menu-item:hover {
-  background: rgba(15, 23, 42, 0.06);
+    background: rgba(15, 23, 42, 0.06);
 }
 
 .loading,
 .empty-chat {
-  font-size: 13px;
-  color: var(--ink-soft);
-  text-align: center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
 }
 
 .contacts-panel .empty-chat {
-  color: #64748b;
+    color: #64748b;
 }
 
 .serach_input {
-  width: 80%;
-  border-radius: 8px;
+    width: 80%;
+    border-radius: 8px;
 }
 
 .add_friend_icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin: 5px;
-  margin-left: 10px;
-  color: #1d4ed8;
-  background-color: #eaf2ff;
-  border: 1px solid rgba(72, 147, 214, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 5px;
+    margin-left: 10px;
+    color: #1d4ed8;
+    background-color: #eaf2ff;
+    border: 1px solid rgba(72, 147, 214, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
 }
 
 .add-friend-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
 .add-friend-menu {
-  position: absolute;
-  top: 52px;
-  right: 0;
-  min-width: 160px;
-  background: rgba(20, 24, 33, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 8px;
-  display: grid;
-  gap: 6px;
-  z-index: 12;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+    position: absolute;
+    top: 52px;
+    right: 0;
+    min-width: 160px;
+    background: rgba(20, 24, 33, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    z-index: 12;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
 }
 
 .add-friend-item {
-  border: none;
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: transparent;
-  color: #e5e7eb;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: transparent;
+    color: #e5e7eb;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
 }
 
 .add-friend-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .group-modal {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  z-index: 4200;
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 4200;
 }
 
 .group-modal__panel {
-  position: relative;
-  width: min(720px, 92vw);
-  min-height: 420px;
-  border-radius: 18px;
-  background: #3a3a3a;
-  color: #f9fafb;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.35);
-  z-index: 1;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+    position: relative;
+    width: min(720px, 92vw);
+    min-height: 420px;
+    border-radius: 18px;
+    background: #3a3a3a;
+    color: #f9fafb;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 60px rgba(17, 24, 39, 0.35);
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
 }
 
 .group-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .group-modal__title {
-  font-size: 16px;
-  font-weight: 600;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .group-modal__close {
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 20px;
-  cursor: pointer;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 20px;
+    cursor: pointer;
 }
 
 .group-modal__body {
-  display: flex;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 16px;
-  padding: 16px 20px;
+    display: flex;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 16px;
+    padding: 16px 20px;
 }
 
 .group-modal__left {
-  width: 40%;
+    width: 40%;
 }
+
 .group-modal__right {
-  width: 60%;
+    width: 60%;
 }
 
 .group-modal__left,
 .group-modal__right {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 14px;
-  padding: 12px;
-  display: grid;
-  gap: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
+    padding: 12px;
+    display: grid;
+    gap: 12px;
 }
 
 .group-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  height: 6vh;
-  width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    height: 6vh;
+    width: 100%;
 }
 
 .group-search__icon {
-  color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .group-search__input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: #f9fafb;
-  font-size: 13px;
-  outline: none;
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #f9fafb;
+    font-size: 13px;
+    outline: none;
 }
 
 .group-list {
-  display: grid;
-  gap: 8px;
-  max-height: 330px;
-  overflow: auto;
+    display: grid;
+    gap: 8px;
+    max-height: 330px;
+    overflow: auto;
 }
 
 .group-item {
-  border: none;
-  background: transparent;
-  color: #f9fafb;
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  text-align: left;
+    border: none;
+    background: transparent;
+    color: #f9fafb;
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
 }
 
 .group-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .group-check {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .group-check.active {
-  background: #2563eb;
-  border-color: #2563eb;
-  box-shadow: inset 0 0 0 3px #1e1e1e;
+    background: #2563eb;
+    border-color: #2563eb;
+    box-shadow: inset 0 0 0 3px #1e1e1e;
 }
 
 .group-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.12);
-  display: grid;
-  place-items: center;
-  font-size: 12px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
 }
 
 .group-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .group-name {
-  font-size: 13px;
+    font-size: 13px;
 }
 
 .group-selected-title {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .group-selected-list {
-  display: grid;
-  gap: 10px;
-  max-height: 330px;
-  overflow: auto;
+    display: grid;
+    gap: 10px;
+    max-height: 330px;
+    overflow: auto;
 }
 
 .group-selected-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .group-remove {
-  border: none;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  cursor: pointer;
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
 }
 
 .group-empty {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  padding: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    padding: 8px;
 }
 
 .group-modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 20px 18px;
 }
 
 .group-cancel,
 .group-confirm {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 22px;
-  font-size: 13px;
-  cursor: pointer;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 22px;
+    font-size: 13px;
+    cursor: pointer;
 }
 
 .group-cancel {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
 }
 
 .group-confirm {
-  background: #2563eb;
-  color: #fff;
+    background: #2563eb;
+    color: #fff;
 }
 
 .group-confirm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.chat-group-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    display: grid;
+    place-items: center;
+    z-index: 4300;
+}
+
+.chat-group-panel {
+    width: min(840px, 92vw);
+    min-height: 520px;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+    display: grid;
+    grid-template-rows: 1fr auto;
+    overflow: hidden;
+}
+
+.chat-group-body {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    min-height: 0;
+}
+
+.chat-group-left,
+.chat-group-right {
+    padding: 20px 22px;
+    display: grid;
+    gap: 14px;
+    min-height: 0;
+}
+
+.chat-group-left {
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.chat-group-search {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 8px;
+    background: #f3f4f6;
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.chat-group-search input {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+}
+
+.chat-group-search input:focus {
+    outline: none;
+}
+
+.chat-group-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.chat-group-list {
+    display: grid;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.chat-group-item {
+    border: none;
+    background: transparent;
+    display: grid;
+    grid-template-columns: 18px 36px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.chat-group-item:hover {
+    background: rgba(15, 23, 42, 0.04);
+}
+
+.chat-group-check {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #d1d5db;
+    display: grid;
+    place-items: center;
+}
+
+.chat-group-check.active {
+    border-color: #60a5fa;
+    box-shadow: inset 0 0 0 4px #60a5fa;
+}
+
+.chat-group-check.locked {
+    border-color: #60a5fa;
+    box-shadow: inset 0 0 0 4px #60a5fa;
+    opacity: 0.7;
+}
+
+.chat-group-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    font-size: 12px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.chat-group-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.chat-group-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.chat-group-name small {
+    font-size: 12px;
+    color: #6b7280;
+    margin-left: 4px;
+}
+
+.chat-group-right-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.chat-group-selected {
+    display: grid;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.chat-group-selected-item {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 4px;
+}
+
+.chat-group-remove {
+    border: none;
+    background: rgba(15, 23, 42, 0.08);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #111827;
+}
+
+.chat-group-owner-tag {
+    font-size: 11px;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.12);
+    padding: 2px 6px;
+    border-radius: 999px;
+}
+
+.chat-group-empty {
+    font-size: 12px;
+    color: #9ca3af;
+    padding: 8px 0;
+}
+
+.chat-group-footer {
+    padding: 14px 22px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.chat-group-cancel,
+.chat-group-confirm {
+    border: none;
+    border-radius: 12px;
+    padding: 8px 22px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.chat-group-cancel {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.chat-group-confirm {
+    background: #60a5fa;
+    color: #fff;
+}
+
+.chat-group-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .share-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
 }
 
 .share-panel {
-  width: 720px;
-  max-width: calc(100vw - 40px);
-  background: #ffffff;
-  border-radius: 18px;
-  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  overflow: hidden;
-  position: fixed;
+    width: 720px;
+    max-width: calc(100vw - 40px);
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+    position: fixed;
 }
 
 .share-left {
-  padding: 18px;
-  border-right: 1px solid rgba(15, 23, 42, 0.08);
-  display: grid;
-  gap: 12px;
+    padding: 18px;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+    display: grid;
+    gap: 12px;
 }
 
 .share-search {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 8px;
-  background: #f3f4f6;
-  border-radius: 12px;
-  padding: 6px 10px;
-  font-size: 13px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 8px;
+    background: #f3f4f6;
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 13px;
 }
 
 .share-search input {
-  border: none;
-  background: transparent;
-  font-size: 13px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
 }
 
 .share-search input:focus {
-  outline: none;
+    outline: none;
 }
 
 .share-create-btn {
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  color: #111827;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #111827;
 }
 
 .share-section-title {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 600;
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 600;
 }
 
 .share-list {
-  display: grid;
-  gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
-  padding-right: 4px;
+    display: grid;
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .share-item {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: center;
-  gap: 10px;
-  border: none;
-  background: transparent;
-  padding: 6px 8px;
-  border-radius: 12px;
-  cursor: pointer;
-  text-align: left;
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    background: transparent;
+    padding: 6px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
 }
 
 .share-item:hover {
-  background: rgba(15, 23, 42, 0.04);
+    background: rgba(15, 23, 42, 0.04);
 }
 
 .share-radio {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1px solid #d1d5db;
-  display: grid;
-  place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #d1d5db;
+    display: grid;
+    place-items: center;
 }
 
 .share-radio.selected {
-  border-color: #60a5fa;
-  box-shadow: inset 0 0 0 4px #60a5fa;
+    border-color: #60a5fa;
+    box-shadow: inset 0 0 0 4px #60a5fa;
 }
 
 .share-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #1f4c7a;
-  color: #fff;
-  font-size: 11px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1f4c7a;
+    color: #fff;
+    font-size: 11px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
 }
 
 .share-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .share-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .share-empty {
-  font-size: 12px;
-  color: #9ca3af;
-  padding: 12px 4px;
+    font-size: 12px;
+    color: #9ca3af;
+    padding: 12px 4px;
 }
 
 .share-right {
-  padding: 18px;
-  display: grid;
-  gap: 12px;
-  align-content: start;
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+    align-content: start;
 }
 
 .share-header {
-  font-size: 13px;
-  color: #6b7280;
+    font-size: 13px;
+    color: #6b7280;
 }
 
 .share-target-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
 }
 
 .share-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
-  padding: 12px;
-  display: grid;
-  gap: 10px;
-  background: #f9fafb;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    background: #f9fafb;
 }
 
 .share-card-title {
-  font-size: 12px;
-  color: #9ca3af;
+    font-size: 12px;
+    color: #9ca3af;
 }
 
 .share-card-main {
-  display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 10px;
-  align-items: center;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 10px;
+    align-items: center;
 }
 
 .share-card-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: #1f4c7a;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  font-weight: 600;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #1f4c7a;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-weight: 600;
 }
 
 .share-card-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .share-card-meta {
-  display: grid;
-  gap: 4px;
+    display: grid;
+    gap: 4px;
 }
 
 .share-card-name {
-  font-weight: 600;
-  font-size: 13px;
+    font-weight: 600;
+    font-size: 13px;
 }
 
 .share-card-uid {
-  font-size: 11px;
-  color: #6b7280;
+    font-size: 11px;
+    color: #6b7280;
 }
 
 .share-note textarea {
-  width: 100%;
-  min-height: 80px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  padding: 10px;
-  resize: none;
-  font-size: 12px;
-  background: #ffffff;
+    width: 100%;
+    min-height: 80px;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    padding: 10px;
+    resize: none;
+    font-size: 12px;
+    background: #ffffff;
 }
 
 .share-note textarea:focus {
-  outline: none;
-  border-color: rgba(37, 99, 235, 0.4);
+    outline: none;
+    border-color: rgba(37, 99, 235, 0.4);
 }
 
 .share-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .share-confirm,
 .share-cancel {
-  border: none;
-  border-radius: 12px;
-  padding: 8px 18px;
-  font-size: 12px;
-  cursor: pointer;
+    border: none;
+    border-radius: 12px;
+    padding: 8px 18px;
+    font-size: 12px;
+    cursor: pointer;
 }
 
 .share-confirm {
-  background: #60a5fa;
-  color: #fff;
+    background: #60a5fa;
+    color: #fff;
 }
 
 .share-confirm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .share-cancel {
-  background: #f3f4f6;
-  color: #374151;
+    background: #f3f4f6;
+    color: #374151;
 }
 </style>
