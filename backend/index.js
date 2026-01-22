@@ -32,10 +32,15 @@ app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-File-Ext, X-File-Hash, X-File-Name, X-File-Type'
-  );
+  const requestHeaders = req.headers['access-control-request-headers'];
+  if (requestHeaders) {
+    res.setHeader('Access-Control-Allow-Headers', requestHeaders);
+  } else {
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-File-Ext, X-File-Hash, X-File-Name, X-File-Type'
+    );
+  }
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
