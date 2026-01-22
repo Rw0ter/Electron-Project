@@ -35,7 +35,11 @@
                                 </div>
                                 <div class="profile-meta">
                                     <div class="profile-name">{{ displayName }}</div>
-                                    <div class="profile-uid">UID {{ auth.uid || '---' }}</div>
+                                    <div class="profile-uid">
+                                        <span>UID {{ auth.uid || '---' }}</span>
+                                        <button class="profile-uid-copy" type="button" title="复制"
+                                            @click="copyProfileUid(auth.uid)">⧉</button>
+                                    </div>
                                     <div class="profile-signature">{{ signature }}</div>
                                     <div class="profile-details">
                                         <div class="profile-detail">性别：{{ auth.gender || '未设置' }}</div>
@@ -260,7 +264,11 @@
                                     </div>
                                     <div class="profile-meta">
                                         <div class="profile-name">{{ friendDisplayName }}</div>
-                                        <div class="profile-uid">UID {{ friendProfileSource?.uid || '---' }}</div>
+                                        <div class="profile-uid">
+                                            <span>UID {{ friendProfileSource?.uid || '---' }}</span>
+                                            <button class="profile-uid-copy" type="button" title="复制"
+                                                @click="copyProfileUid(friendProfileSource?.uid)">⧉</button>
+                                        </div>
                                         <div class="profile-signature">{{ friendSignature }}</div>
                                         <div class="profile-details">
                                             <div class="profile-detail">性别：{{ friendProfileSource?.gender || '未设置' }}
@@ -346,7 +354,10 @@
                                         </template>
                                         <span v-else>{{ renderMessage(msg) }}</span>
                                     </div>
-                                    <div class="bubble-time">{{ formatTime(msg.createdAt) }}</div>
+                                    <div class="bubble-time">
+                                        {{ formatTime(msg.createdAt) }}
+                                    </div>
+                                    <span v-if="msg.pending" class="bubble-pending-spinner"></span>
                                 </div>
                                 <div v-if="blockNoticeText" class="chat-block-notice">
                                     {{ blockNoticeText }}
@@ -415,8 +426,11 @@
                                     </div>
                                 </div>
                                 <textarea v-model="draft" ref="composerTextareaRef" placeholder=""
-                                    @keydown.enter.exact.prevent="sendMessage" @keydown.enter.shift.stop
+                                    @keydown.enter.exact.prevent="handleComposerEnter"
+                                    @keydown.enter.shift.stop
                                     @keydown.backspace="handleComposerBackspace"
+                                    @compositionstart="isComposing = true"
+                                    @compositionend="isComposing = false"
                                     @paste="handleComposerPaste"></textarea>
                             </div>
                         </div>
@@ -512,7 +526,11 @@
                                     </div>
                                     <div class="profile-meta">
                                         <div class="profile-name">{{ contactDisplayName }}</div>
-                                        <div class="profile-uid">UID {{ contactProfileSource?.uid || '---' }}</div>
+                                        <div class="profile-uid">
+                                            <span>UID {{ contactProfileSource?.uid || '---' }}</span>
+                                            <button class="profile-uid-copy" type="button" title="复制"
+                                                @click="copyProfileUid(contactProfileSource?.uid)">⧉</button>
+                                        </div>
                                         <div class="profile-signature">{{ contactSignature }}</div>
                                         <div class="profile-details">
                                             <div class="profile-detail">性别：{{ contactProfileSource?.gender || '未设置' }}
@@ -805,6 +823,62 @@
                 </div>
             </div>
         </transition>
+        <transition name="file-modal" appear>
+            <div v-show="showGroupModal" class="group-modal">
+                <div class="file-modal__backdrop" @click="closeGroupModal"></div>
+                <div class="group-modal__panel">
+                    <div class="group-modal__header">
+                        <div class="group-modal__title">创建群聊</div>
+                        <button class="group-modal__close" type="button" @click="closeGroupModal">×</button>
+                    </div>
+                    <div class="group-modal__body">
+                        <div class="group-modal__left">
+                            <div class="group-search">
+                                <span class="group-search__icon">&#xE8B2;</span>
+                                <input v-model="groupSearch" class="group-search__input" type="text"
+                                    placeholder="搜索好友" />
+                            </div>
+                            <div class="group-list">
+                                <button v-for="friend in filteredGroupFriends" :key="friend.uid"
+                                    class="group-item" type="button" @click="toggleGroupSelection(friend)">
+                                    <span class="group-check" :class="{ active: isGroupSelected(friend.uid) }"></span>
+                                    <span class="group-avatar">
+                                        <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                        <span v-else>{{ friend.username?.slice(0, 2).toUpperCase() }}</span>
+                                    </span>
+                                    <span class="group-name">{{ friend.username }}</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="group-modal__right">
+                            <div class="group-selected-title">
+                                已选 {{ selectedGroupUids.length }} 人
+                            </div>
+                            <div class="group-selected-list">
+                                <div v-for="friend in selectedGroupFriends" :key="friend.uid"
+                                    class="group-selected-item">
+                                    <span class="group-avatar">
+                                        <img v-if="friend.avatar" :src="friend.avatar" alt="avatar" />
+                                        <span v-else>{{ friend.username?.slice(0, 2).toUpperCase() }}</span>
+                                    </span>
+                                    <span class="group-name">{{ friend.username }}</span>
+                                    <button class="group-remove" type="button"
+                                        @click="toggleGroupSelection(friend)">×</button>
+                                </div>
+                                <div v-if="!selectedGroupFriends.length" class="group-empty">
+                                    选择好友开始建群
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="group-modal__footer">
+                        <button class="group-cancel" type="button" @click="closeGroupModal">取消</button>
+                        <button class="group-confirm" type="button" :disabled="!selectedGroupUids.length"
+                            @click="confirmCreateGroup">确定</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
     </div>
 </template>
 
@@ -925,6 +999,10 @@ const lastMessageSignature = ref('');
 const voiceSignalQueue = ref([]);
 const showAddMenu = ref(false);
 const addFriendRef = ref(null);
+const showGroupModal = ref(false);
+const groupSearch = ref('');
+const selectedGroupUids = ref([]);
+const isComposing = ref(false);
 
 const handleMin = () => window.electronAPI?.windowMin?.();
 const handleMax = () => window.electronAPI?.windowMax?.();
@@ -1115,6 +1193,17 @@ const releaseDraftImage = (item) => {
     }
 };
 
+const revokeBlobUrlsFromEntry = (entry) => {
+    const urls = Array.isArray(entry?.data?.urls) ? entry.data.urls : [];
+    urls.forEach((url) => {
+        if (typeof url === 'string' && url.startsWith('blob:')) {
+            try {
+                URL.revokeObjectURL(url);
+            } catch {}
+        }
+    });
+};
+
 const runWithConcurrency = async (tasks, limit) => {
     const results = new Array(tasks.length);
     let nextIndex = 0;
@@ -1186,8 +1275,10 @@ const triggerFileSelect = () => {
     fileInputRef.value?.click?.();
 };
 
-const clearDraftImages = () => {
-    draftImages.value.forEach(releaseDraftImage);
+const clearDraftImages = ({ preservePreviews } = {}) => {
+    if (!preservePreviews) {
+        draftImages.value.forEach(releaseDraftImage);
+    }
     draftImages.value = [];
     if (imageInputRef.value) {
         imageInputRef.value.value = '';
@@ -1209,6 +1300,11 @@ const handleComposerBackspace = (event) => {
     releaseDraftImage(last);
     draftImages.value = draftImages.value.slice(0, -1);
     event.preventDefault();
+};
+
+const handleComposerEnter = () => {
+    if (isComposing.value) return;
+    sendMessage();
 };
 
 const startComposerResize = (event) => {
@@ -1379,6 +1475,12 @@ const copyText = async (text) => {
     } catch {
         return false;
     }
+};
+
+const copyProfileUid = async (uid) => {
+    if (!uid) return;
+    const ok = await copyText(String(uid));
+    statusText.value = ok ? 'UID 已复制' : '复制失败';
 };
 
 const pinFriendFromMenu = () => {
@@ -2334,8 +2436,53 @@ const handleAddAction = (type) => {
         return;
     }
     if (type === 'group') {
-        statusText.value = '创建群聊功能待完善';
+        openGroupModal();
     }
+};
+
+const openGroupModal = () => {
+    groupSearch.value = '';
+    selectedGroupUids.value = [];
+    showGroupModal.value = true;
+};
+
+const closeGroupModal = () => {
+    showGroupModal.value = false;
+};
+
+const toggleGroupSelection = (friend) => {
+    if (!friend?.uid) return;
+    const exists = selectedGroupUids.value.includes(friend.uid);
+    if (exists) {
+        selectedGroupUids.value = selectedGroupUids.value.filter((uid) => uid !== friend.uid);
+    } else {
+        selectedGroupUids.value = [...selectedGroupUids.value, friend.uid];
+    }
+};
+
+const isGroupSelected = (uid) => selectedGroupUids.value.includes(uid);
+
+const filteredGroupFriends = computed(() => {
+    const keyword = groupSearch.value.trim().toLowerCase();
+    if (!keyword) return friends.value;
+    return friends.value.filter((friend) => {
+        const name = (friend.username || '').toLowerCase();
+        const uidText = String(friend.uid || '');
+        return name.includes(keyword) || uidText.includes(keyword);
+    });
+});
+
+const selectedGroupFriends = computed(() =>
+    friends.value.filter((friend) => selectedGroupUids.value.includes(friend.uid))
+);
+
+const confirmCreateGroup = () => {
+    if (!selectedGroupUids.value.length) {
+        statusText.value = '请选择好友';
+        return;
+    }
+    statusText.value = '群聊创建功能待完善';
+    closeGroupModal();
 };
 
 const handleDocumentClick = (event) => {
@@ -2383,6 +2530,12 @@ const handleDocumentClick = (event) => {
         const wrap = addFriendRef.value;
         if (!wrap || !wrap.contains(event.target)) {
             showAddMenu.value = false;
+        }
+    }
+    if (showGroupModal.value) {
+        const panel = event.target?.closest?.('.group-modal__panel');
+        if (!panel) {
+            closeGroupModal();
         }
     }
 };
@@ -3390,22 +3543,24 @@ const sendChatEntryTo = async ({ type, data, payload, targetUid }) => {
     }
 };
 
-const sendChatEntry = async ({ type, data, payload }) => {
+const sendChatEntry = async ({ type, data, payload, localId: existingLocalId } = {}) => {
     const targetUid = activeFriend.value?.uid;
     if (!targetUid) return false;
-    const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const localEntry = {
-        id: localId,
-        type,
-        senderUid: auth.value.uid,
-        targetUid,
-        targetType: 'private',
-        data,
-        createdAt: new Date().toISOString(),
-        pending: true,
-        error: false
-    };
-    localMessages.value = [...localMessages.value, localEntry];
+    const localId = existingLocalId || `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    if (!existingLocalId) {
+        const localEntry = {
+            id: localId,
+            type,
+            senderUid: auth.value.uid,
+            targetUid,
+            targetType: 'private',
+            data,
+            createdAt: new Date().toISOString(),
+            pending: true,
+            error: false
+        };
+        localMessages.value = [...localMessages.value, localEntry];
+    }
     try {
         const res = await fetch(`${API_BASE}/api/chat/send`, {
             method: 'POST',
@@ -3429,6 +3584,10 @@ const sendChatEntry = async ({ type, data, payload }) => {
             }
             await nextTick();
             scrollToBottom();
+            const localEntry = localMessages.value.find((item) => item.id === localId);
+            if (localEntry) {
+                revokeBlobUrlsFromEntry(localEntry);
+            }
             localMessages.value = localMessages.value.filter((item) => item.id !== localId);
             updateRecentChat(targetUid);
             return true;
@@ -3484,78 +3643,109 @@ const sendMessage = async () => {
     const hasImages = draftImages.value.length > 0;
     if (!hasText && !hasImages) return;
     if (hasImages) {
-        if (pendingImageHashes.size) {
-            await Promise.all([...pendingImageHashes.values()]);
-        }
-        const hashToUrl = new Map();
-        const uploads = [];
-        draftImages.value.forEach((item) => {
-            if (!item.hash) {
-                return;
-            }
-            const cached = imageUploadCache.get(item.hash) || {};
-            if (cached.url) {
-                hashToUrl.set(item.hash, cached.url);
-                return;
-            }
-            if (!item.file) {
-                return;
-            }
-            if (hashToUrl.has(item.hash)) {
-                return;
-            }
-            uploads.push(async () => {
-                const url = await uploadImageBinary(item.file, item.hash);
-                hashToUrl.set(item.hash, url);
-                imageUploadCache.set(item.hash, { ...cached, url });
-            });
-        });
-        if (uploads.length) {
-            try {
-                await runWithConcurrency(uploads, UPLOAD_CONCURRENCY);
-            } catch (error) {
-                statusText.value = error?.message || '图片上传失败';
-                return;
-            }
-        }
-        const urls = draftImages.value.map((item) => {
-            if (!item.hash) {
-                return '';
-            }
-            const cached = imageUploadCache.get(item.hash) || {};
-            return cached.url || hashToUrl.get(item.hash) || '';
-        });
-        const payload = {
-            urls: urls.filter((url) => typeof url === 'string' && url.trim()),
-            content: hasText ? content : ''
-        };
-        if (!payload.urls.length) {
-            statusText.value = '图片上传失败';
-            return;
-        }
-        const ok = await sendChatEntry({
+        const targetUid = activeFriend.value?.uid;
+        const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const batch = draftImages.value.slice();
+        const previewUrls = batch
+            .map((item) => item.preview)
+            .filter((url) => typeof url === 'string' && url.trim());
+        const localEntry = {
+            id: localId,
             type: 'image',
-            data: payload,
-            payload
-        });
-        if (ok) {
-            const latest = messages.value[messages.value.length - 1];
-            const urlsFromServer = Array.isArray(latest?.data?.urls) ? latest.data.urls : [];
-            urlsFromServer.forEach((url) => {
-                const match = /\/uploads\/images\/([a-f0-9]+)\.(png|jpe?g|gif|webp)/i.exec(url || '');
-                if (!match) return;
-                const hash = match[1];
-                const cached = imageUploadCache.get(hash) || {};
-                imageUploadCache.set(hash, { ...cached, url });
-            });
-            clearDraftImages();
-            if (hasText) {
-                draft.value = '';
-            }
+            senderUid: auth.value.uid,
+            targetUid,
+            targetType: 'private',
+            data: { urls: previewUrls, content: hasText ? content : '' },
+            createdAt: new Date().toISOString(),
+            pending: true,
+            error: false
+        };
+        localMessages.value = [...localMessages.value, localEntry];
+        clearDraftImages({ preservePreviews: true });
+        if (hasText) {
+            draft.value = '';
         }
+        void (async () => {
+            await Promise.all(
+                batch.map(async (item) => {
+                    if (item.hash) return;
+                    const pending = pendingImageHashes.get(item.id);
+                    if (pending) {
+                        const hash = await pending;
+                        if (hash) {
+                            item.hash = hash;
+                        }
+                    }
+                })
+            );
+            const hashToUrl = new Map();
+            const uploads = [];
+            batch.forEach((item) => {
+                if (!item.hash) return;
+                const cached = imageUploadCache.get(item.hash) || {};
+                if (cached.url) {
+                    hashToUrl.set(item.hash, cached.url);
+                    return;
+                }
+                if (!item.file) return;
+                if (hashToUrl.has(item.hash)) return;
+                uploads.push(async () => {
+                    const url = await uploadImageBinary(item.file, item.hash);
+                    hashToUrl.set(item.hash, url);
+                    imageUploadCache.set(item.hash, { ...cached, url });
+                });
+            });
+            if (uploads.length) {
+                try {
+                    await runWithConcurrency(uploads, UPLOAD_CONCURRENCY);
+                } catch (error) {
+                    statusText.value = error?.message || '图片上传失败';
+                    localMessages.value = localMessages.value.map((item) =>
+                        item.id === localId ? { ...item, pending: false, error: true } : item
+                    );
+                    return;
+                }
+            }
+            const uploadUrls = [];
+            batch.forEach((item) => {
+                if (!item.hash) return;
+                const cached = imageUploadCache.get(item.hash) || {};
+                const url = cached.url || hashToUrl.get(item.hash) || '';
+                if (url) uploadUrls.push(url);
+            });
+            const payload = {
+                urls: uploadUrls,
+                content: hasText ? content : ''
+            };
+            if (!payload.urls.length) {
+                statusText.value = '图片上传失败';
+                localMessages.value = localMessages.value.map((item) =>
+                    item.id === localId ? { ...item, pending: false, error: true } : item
+                );
+                return;
+            }
+            const ok = await sendChatEntry({
+                type: 'image',
+                data: payload,
+                payload,
+                localId
+            });
+            if (ok) {
+                const latest = messages.value[messages.value.length - 1];
+                const urlsFromServer = Array.isArray(latest?.data?.urls) ? latest.data.urls : [];
+                urlsFromServer.forEach((url) => {
+                    const match = /\/uploads\/images\/([a-f0-9]+)\.(png|jpe?g|gif|webp)/i.exec(url || '');
+                    if (!match) return;
+                    const hash = match[1];
+                    const cached = imageUploadCache.get(hash) || {};
+                    imageUploadCache.set(hash, { ...cached, url });
+                });
+            }
+        })();
         return;
     }
     if (hasText) {
+        draft.value = '';
         const ok = await sendChatEntry({
             type: 'text',
             data: { content },
@@ -3924,8 +4114,30 @@ onBeforeUnmount(() => {
 }
 
 .profile-uid {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 12px;
     color: rgba(28, 36, 54, 0.6);
+}
+
+.profile-uid-copy {
+    border: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(28, 36, 54, 0.08);
+    color: rgba(28, 36, 54, 0.7);
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.profile-uid-copy:hover {
+    background: rgba(28, 36, 54, 0.16);
 }
 
 .profile-signature {
@@ -5639,6 +5851,27 @@ select:focus {
     text-align: right;
 }
 
+.bubble-pending-spinner {
+    position: absolute;
+    left: -22px;
+    bottom: 10px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: rgba(255, 255, 255, 0.9);
+    animation: bubble-spin 0.9s linear infinite;
+}
+
+@keyframes bubble-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .composer {
     padding: 16px 22px 18px;
     border-top: 1px solid var(--line);
@@ -6149,6 +6382,225 @@ select:focus {
 
 .add-friend-item:hover {
     background: rgba(255, 255, 255, 0.08);
+}
+
+.group-modal {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 4200;
+}
+
+.group-modal__panel {
+    position: relative;
+    width: min(720px, 92vw);
+    min-height: 420px;
+    border-radius: 18px;
+    background: #3a3a3a;
+    color: #f9fafb;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 60px rgba(17, 24, 39, 0.35);
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+}
+
+.group-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.group-modal__title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.group-modal__close {
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.group-modal__body {
+    display: flex;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 16px;
+    padding: 16px 20px;
+}
+
+.group-modal__left{
+    width: 40%;
+}
+.group-modal__right{
+    width: 60%;
+}
+
+
+.group-modal__left,
+.group-modal__right {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
+    padding: 12px;
+    display: grid;
+    gap: 12px;
+}
+
+.group-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    height: 6vh;
+    width: 100%;
+}
+
+.group-search__icon {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.group-search__input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #f9fafb;
+    font-size: 13px;
+    outline: none;
+}
+
+.group-list {
+    display: grid;
+    gap: 8px;
+    max-height: 330px;
+    overflow: auto;
+}
+
+.group-item {
+    border: none;
+    background: transparent;
+    color: #f9fafb;
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.group-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.group-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.group-check.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    box-shadow: inset 0 0 0 3px #1e1e1e;
+}
+
+.group-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+}
+
+.group-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.group-name {
+    font-size: 13px;
+}
+
+.group-selected-title {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.group-selected-list {
+    display: grid;
+    gap: 10px;
+    max-height: 330px;
+    overflow: auto;
+}
+
+.group-selected-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.group-remove {
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.group-empty {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    padding: 8px;
+}
+
+.group-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 20px 18px;
+}
+
+.group-cancel,
+.group-confirm {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 22px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.group-cancel {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+.group-confirm {
+    background: #2563eb;
+    color: #fff;
+}
+
+.group-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .share-modal {
